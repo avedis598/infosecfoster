@@ -7,5 +7,6 @@
   "cf_zone": "717dadb84988a4b37093269be1a70773",
   "cf_domain": "infosecfoster.com",
   "user": "amlak-siem-admin",
-  "key_path": "~/.ssh/aml_siem_key"
+  "key_path": "~/.ssh/aml_siem_key",
+  "alert_email": "sheikhsanath12@gmail.com"
 }
