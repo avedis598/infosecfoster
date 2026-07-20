@@ -96,6 +96,7 @@ class AMLSiemApp(tk.Tk):
         if "key_path" in config_data: self.tab_conn.key_var.set(config_data["key_path"])
         if "cf_token" in config_data: self.tab_conn.cf_token_var.set(config_data["cf_token"])
         if "cf_zone" in config_data: self.tab_conn.cf_zone_var.set(config_data["cf_zone"])
+        if "alert_email" in config_data: self.tab_conn.alert_email_var.set(config_data["alert_email"])
 
     def _drain_queue(self):
         """Safely apply UI updates coming from the background orchestrator."""
@@ -125,7 +126,8 @@ class AMLSiemApp(tk.Tk):
             "user": self.tab_conn.user_var.get(),
             "key_path": self.tab_conn.key_var.get(),
             "cf_token": self.tab_conn.cf_token_var.get(),
-            "cf_zone": self.tab_conn.cf_zone_var.get()
+            "cf_zone": self.tab_conn.cf_zone_var.get(),
+            "alert_email": self.tab_conn.alert_email_var.get()
         })
         messagebox.showinfo("Success", f"Configuration saved to {config_path}")
 
@@ -157,7 +159,8 @@ class AMLSiemApp(tk.Tk):
             "user": user,
             "key_path": key,
             "cf_token": self.tab_conn.cf_token_var.get(),
-            "cf_zone": self.tab_conn.cf_zone_var.get()
+            "cf_zone": self.tab_conn.cf_zone_var.get(),
+            "alert_email": self.tab_conn.alert_email_var.get()
         })
         
         # Reload config to ensure we have cf_domain

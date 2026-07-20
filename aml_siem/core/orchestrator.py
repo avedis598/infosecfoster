@@ -22,6 +22,7 @@ class Orchestrator:
         from .config import load_config
         cfg = load_config()
         domain = cfg.get("cf_domain", "amlsiem.com")
+        alert_email = cfg.get("alert_email", "admin@amlsiem.com")
         
         def worker():
             try:
@@ -42,7 +43,7 @@ class Orchestrator:
                     # Pre-check (skip if already done)
                     pre = step.get("pre_check", "")
                     if pre:
-                        pre = pre.replace("amlsiem.com", domain)
+                        pre = pre.replace("admin@amlsiem.com", alert_email).replace("amlsiem.com", domain)
                     pre_lbl = step.get("pre_check_label", "")
                     if pre and pre != "false":
                         ok, out = self.ssh.run(pre)
@@ -77,14 +78,14 @@ class Orchestrator:
                             elif sub_mode == "remote_upload":
                                 script = cmd_dict.get("script", "")
                                 if script:
-                                    script = script.replace("amlsiem.com", domain)
+                                    script = script.replace("admin@amlsiem.com", alert_email).replace("amlsiem.com", domain)
                                 ok, output = self.ssh.run_script(script)
                             else:
                                 cmd_str = cmd_dict.get("cmd", "")
                                 if not cmd_str:
                                     ok, output = True, ""
                                 else:
-                                    cmd_str = cmd_str.replace("amlsiem.com", domain)
+                                    cmd_str = cmd_str.replace("admin@amlsiem.com", alert_email).replace("amlsiem.com", domain)
                                     ok, output = self.ssh.run(cmd_str)
                                     
                             if output:
