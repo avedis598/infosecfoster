@@ -1,0 +1,11 @@
+{
+  "host": "34.18.98.101",
+  "port": "22",
+  "username": "amlak-siem-admin",
+  "ssh_key": "/Users/sanathalishaikh/.ssh/aml_siem_key",
+  "cf_token": "cfut_C7vOHsxisdawVXVKVLzcSWLwIEN7vJWD0KwcLyvu40e97253",
+  "cf_zone": "717dadb84988a4b37093269be1a70773",
+  "cf_domain": "infosecfoster.com",
+  "user": "amlak-siem-admin",
+  "key_path": "~/.ssh/aml_siem_key"
+}
