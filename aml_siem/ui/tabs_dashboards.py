@@ -66,11 +66,11 @@ class TheHiveTab(BaseDashboardTab):
         super().__init__(parent, "TheHive", C["thehive"])
         
         tk.Label(self.creds_frame, text="Username: admin@thehive.local", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
-        tk.Label(self.creds_frame, text="Password: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        tk.Label(self.creds_frame, text="Password: secret", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
 
 class ShuffleTab(BaseDashboardTab):
     def __init__(self, parent):
         super().__init__(parent, "Shuffle SOAR", C["shuffle"])
         
-        tk.Label(self.creds_frame, text="Username: admin@shuffle.local", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
-        tk.Label(self.creds_frame, text="Password: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        tk.Label(self.creds_frame, text="Username: admin@amlsiem.com", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        tk.Label(self.creds_frame, text="Password: Admin1234!", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
