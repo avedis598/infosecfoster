@@ -132,11 +132,14 @@ class SetupTab(tk.Frame):
     def _on_run_click(self):
         self.on_run(force=self.force_var.get())
 
-    def _toggle_group(self, var, sids):
+    def _toggle_group(self, var, sids, child_vars=None):
         val = var.get()
         for sid in sids:
             if sid in self.sel_vars:
                 self.sel_vars[sid].set(val)
+        if child_vars:
+            for cv in child_vars:
+                cv.set(val)
 
     def _build_checklist(self, parent):
         grouped = {}
@@ -156,11 +159,12 @@ class SetupTab(tk.Frame):
             sprint_title = self.titles["sprints"].get(sprint_idx, f"Sprint {sprint_idx}")
             sprint_var = tk.BooleanVar(value=True)
             sprint_sids = []
+            sprint_m_vars = []
             
             sprint_frame = CollapsibleFrame(
                 parent, sprint_title, collapsed=(sprint_idx != "0"),
                 show_chk=True, chk_var=sprint_var,
-                chk_command=lambda v=sprint_var, sids=sprint_sids: self._toggle_group(v, sids)
+                chk_command=lambda v=sprint_var, sids=sprint_sids, cvs=sprint_m_vars: self._toggle_group(v, sids, cvs)
             )
             sprint_frame.pack(fill="x", pady=(10,2))
             
@@ -170,6 +174,7 @@ class SetupTab(tk.Frame):
                 collapsed_m = not (sprint_idx == "0" and m_key in ["M0.1", "M0.2"])
                 
                 m_var = tk.BooleanVar(value=True)
+                sprint_m_vars.append(m_var)
                 m_sids = []
                 
                 m_frame = CollapsibleFrame(

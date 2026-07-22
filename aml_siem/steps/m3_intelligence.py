@@ -408,6 +408,44 @@ spec:
       - name: grafana-datasources
         configMap:
           name: grafana-datasources
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: aml-lab
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - grafana.aml-lab.infosecfoster.com
+    - grafana.aml-lab.amlsiem.com
+    secretName: grafana-tls
+  rules:
+  - host: grafana.aml-lab.infosecfoster.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  - host: grafana.aml-lab.amlsiem.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
 INNER
 """
             }
