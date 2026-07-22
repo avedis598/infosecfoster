@@ -12,7 +12,7 @@ class Orchestrator:
         """Push a callable onto the UI queue."""
         self.ui_queue.put(fn)
         
-    def run_steps(self, steps, on_log, on_log_output, on_badge_update, on_sub_update, on_progress, on_complete):
+    def run_steps(self, steps, on_log, on_log_output, on_badge_update, on_sub_update, on_progress, on_complete, force=False):
         """Execute a list of step dictionaries in a background thread."""
         if self.running:
             return False
@@ -42,18 +42,17 @@ class Orchestrator:
                     
                     # Pre-check (skip if already done)
                     pre = step.get("pre_check", "")
-                    if pre:
+                    if pre and not force:
                         pre = pre.replace("admin@amlsiem.com", alert_email).replace("amlsiem.com", domain)
-                    pre_lbl = step.get("pre_check_label", "")
-                    if pre and pre != "false":
-                        ok, out = self.ssh.run(pre)
-                        if ok:
-                            on_log(f"\n{'─'*52}\n[{step_mode.upper()}] {title}", "head")
-                            on_log(f"  ✓ Already done — {title}", "ok")
-                            done += len(step.get("cmds", []))
-                            on_progress(done, total_subs, f"{done}/{total_subs} sub-steps")
-                            on_badge_update(step_id, "Skipped", "gray")
-                            continue
+                        if pre != "false":
+                            ok, out = self.ssh.run(pre)
+                            if ok:
+                                on_log(f"\n{'─'*52}\n[{step_mode.upper()}] {title}", "head")
+                                on_log(f"  ✓ Already done — {title}", "ok")
+                                done += len(step.get("cmds", []))
+                                on_progress(done, total_subs, f"{done}/{total_subs} sub-steps")
+                                on_badge_update(step_id, "Skipped", "gray")
+                                continue
 
                     on_log(f"\n{'─'*52}\n[{step_mode.upper()}] {title}", "head")
                     on_badge_update(step_id, "Running...", "cyan")

@@ -9,8 +9,7 @@ from ..core.orchestrator import Orchestrator
 from .components import C, FONT_BOLD
 from .tabs_connection import ConnectionTab
 from .tabs_setup import SetupTab
-from .tabs_dashboards import WazuhTab, TheHiveTab, ShuffleTab
-
+from .tabs_dashboards import WazuhTab, TheHiveTab, ShuffleTab, GrafanaTab
 class AMLSiemApp(tk.Tk):
     def __init__(self, steps_def):
         super().__init__()
@@ -61,6 +60,7 @@ class AMLSiemApp(tk.Tk):
         self.tab_wazuh = WazuhTab(self.notebook, refresh_callback=self._fetch_wazuh_agents)
         self.tab_thehive = TheHiveTab(self.notebook)
         self.tab_shuffle = ShuffleTab(self.notebook)
+        self.tab_grafana = GrafanaTab(self.notebook)
         
         # Load saved config
         self._populate_config(self.config)
@@ -181,12 +181,14 @@ class AMLSiemApp(tk.Tk):
             self.notebook.add(self.tab_wazuh, text=" Wazuh ")
             self.notebook.add(self.tab_thehive, text=" TheHive ")
             self.notebook.add(self.tab_shuffle, text=" Shuffle ")
+            self.notebook.add(self.tab_grafana, text=" Grafana ")
             
             domain = self.config.get("cf_domain", "amlsiem.com")
             
             self.tab_wazuh.set_url(f"https://wazuh.aml-lab.{domain}")
             self.tab_thehive.set_url(f"https://thehive.aml-lab.{domain}")
             self.tab_shuffle.set_url(f"https://shuffle.aml-lab.{domain}")
+            self.tab_grafana.set_url(f"https://grafana.aml-lab.{domain}")
             
             # Trigger initial fetch
             self._fetch_wazuh_agents()
@@ -211,10 +213,11 @@ class AMLSiemApp(tk.Tk):
             self.notebook.forget(self.tab_wazuh)
             self.notebook.forget(self.tab_thehive)
             self.notebook.forget(self.tab_shuffle)
+            self.notebook.forget(self.tab_grafana)
         except tk.TclError:
             pass
 
-    def _on_run_setup(self):
+    def _on_run_setup(self, force=False):
         if not self.orchestrator or not self.ssh or not self.ssh.is_connected():
             messagebox.showerror("Error", "Please connect to the server first.")
             self.notebook.select(self.tab_conn)
@@ -229,17 +232,22 @@ class AMLSiemApp(tk.Tk):
         self.tab_setup.run_btn.config(state="disabled")
         self.tab_setup.clear_log()
         
+        def safe_ui(fn):
+            if self.orchestrator:
+                self.orchestrator._put_ui(fn)
+
         def on_complete():
-            self.orchestrator._put_ui(lambda: self.tab_setup.run_btn.config(state="normal"))
-            self.orchestrator._put_ui(lambda: self.tab_setup.append_log(f"\n{'═'*52}\n  Run Complete\n{'═'*52}", "head"))
+            safe_ui(lambda: self.tab_setup.run_btn.config(state="normal"))
+            safe_ui(lambda: self.tab_setup.append_log(f"\n{'═'*52}\n  Run Complete\n{'═'*52}", "head"))
             
         self.orchestrator.run_steps(
             steps=steps_to_run,
-            on_log=lambda m, t="": self.orchestrator._put_ui(lambda: self.tab_setup.append_log(m, t)),
-            on_log_output=lambda o: self.orchestrator._put_ui(lambda: self.tab_setup.append_log_output(o)),
-            on_badge_update=lambda sid, txt, col: self.orchestrator._put_ui(lambda: self.tab_setup.set_badge(sid, txt, col)),
-            on_sub_update=lambda sid, idx, st: self.orchestrator._put_ui(lambda: self.tab_setup.set_sub(sid, idx, st)),
-            on_progress=lambda d, t, l="": self.orchestrator._put_ui(lambda: self.tab_setup.set_progress(d, t, l)),
+            force=force,
+            on_log=lambda m, t="": safe_ui(lambda: self.tab_setup.append_log(m, t)),
+            on_log_output=lambda o: safe_ui(lambda: self.tab_setup.append_log_output(o)),
+            on_badge_update=lambda sid, txt, col: safe_ui(lambda: self.tab_setup.set_badge(sid, txt, col)),
+            on_sub_update=lambda sid, idx, st: safe_ui(lambda: self.tab_setup.set_sub(sid, idx, st)),
+            on_progress=lambda d, t, l="": safe_ui(lambda: self.tab_setup.set_progress(d, t, l)),
             on_complete=on_complete
         )
 

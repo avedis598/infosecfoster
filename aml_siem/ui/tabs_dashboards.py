@@ -74,3 +74,10 @@ class ShuffleTab(BaseDashboardTab):
         
         tk.Label(self.creds_frame, text="Username: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
         tk.Label(self.creds_frame, text="Password: Admin1234!", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+
+class GrafanaTab(BaseDashboardTab):
+    def __init__(self, parent):
+        super().__init__(parent, "Grafana", C["warn"])
+        
+        tk.Label(self.creds_frame, text="Anonymous Access Enabled", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        tk.Label(self.creds_frame, text="Login (Optional): admin / admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
