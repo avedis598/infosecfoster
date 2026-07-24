@@ -31,13 +31,20 @@ class ConnectionTab(tk.Frame):
         container = tk.Frame(outer_container, bg=C["card"], padx=40, pady=40)
         container.pack()
         
+        # Config Action Row (Top Right)
+        config_frame = tk.Frame(container, bg=C["card"])
+        config_frame.pack(anchor="ne", pady=(0, 20))
+        FlatBtn(config_frame, text="Load Config", bg=C["border"], fg=C["text"], command=self.on_load_config).pack(side="left", padx=(0,10))
+        FlatBtn(config_frame, text="Save Config", bg=C["border"], fg=C["text"], command=self.on_save_config).pack(side="left")
+
         # Header
-        tk.Label(container, text="Target Server", bg=C["card"], fg=C["text"], 
-                 font=("Segoe UI", 16, "bold")).pack(anchor="center", pady=(0,20))
+        tk.Label(container, text="InfosecFoster", bg=C["card"], fg=C["accent"], 
+                 font=("Segoe UI", 24, "bold")).pack(anchor="center", pady=(0,20))
 
         # Form Grid
         grid = tk.Frame(container, bg=C["card"])
         grid.pack(fill="x")
+        grid.columnconfigure(0, minsize=160)
         grid.columnconfigure(1, weight=1)
 
         fields = [
@@ -68,6 +75,7 @@ class ConnectionTab(tk.Frame):
                  
         cf_grid = tk.Frame(container, bg=C["card"])
         cf_grid.pack(fill="x")
+        cf_grid.columnconfigure(0, minsize=160)
         cf_grid.columnconfigure(1, weight=1)
         
         cf_fields = [
@@ -82,29 +90,28 @@ class ConnectionTab(tk.Frame):
                      insertbackground=C["text"], font=FONT_STEP, relief="flat", bd=5, width=30).grid(
                 row=i, column=1, sticky="we", pady=10)
 
-        # Config Action Row
-        config_frame = tk.Frame(container, bg=C["card"])
-        config_frame.pack(fill="x", pady=(20,0))
-        FlatBtn(config_frame, text="Load Config", bg=C["border"], fg=C["text"], command=self.on_load_config).pack(side="left", padx=(0,10))
-        FlatBtn(config_frame, text="Save Config", bg=C["border"], fg=C["text"], command=self.on_save_config).pack(side="left")
-
-        # Status and Action Row
-        action_frame = tk.Frame(container, bg=C["card"])
-        action_frame.pack(fill="x", pady=(40,0))
-        
-        self.conn_status_lbl = tk.Label(action_frame, textvariable=self.conn_status_var, 
+        # Status Label (Centered)
+        self.conn_status_lbl = tk.Label(container, textvariable=self.conn_status_var, 
                                         bg=C["card"], fg=C["muted"], font=FONT_BOLD)
-        self.conn_status_lbl.pack(side="left")
+        self.conn_status_lbl.pack(pady=(30, 10), anchor="center")
+
+        # Action Buttons Row (Centered)
+        self.button_frame = tk.Frame(container, bg=C["card"])
+        self.button_frame.pack(anchor="center")
         
-        # Connect button in Green, Terminal button in White/Gray
-        self.btn_connect = FlatBtn(action_frame, text="Connect", bg=C["accent"], fg="white", command=self.on_connect)
-        self.btn_connect.pack(side="right")
-        self.btn_term = FlatBtn(action_frame, text="Terminal", bg=C["border"], fg="white", command=lambda: print("Terminal logic pending"))
-        self.btn_term.pack(side="right", padx=(0, 10))
+        self.btn_connect = FlatBtn(self.button_frame, text="Connect", bg=C["accent"], fg="white", command=self.on_connect, width=20, font=FONT_BOLD)
+        self.btn_connect.pack(side="left", padx=5)
         
+        self.btn_term = FlatBtn(self.button_frame, text="Terminal", bg=C["border"], fg="white", command=lambda: print("Terminal logic pending"), width=20, font=FONT_BOLD)
+        # Initially hidden until connected
+
     def set_status(self, text, color):
         self.conn_status_var.set(text)
         self.conn_status_lbl.config(fg=color)
         
     def set_button(self, text, bg, command):
         self.btn_connect.config(text=text, bg=bg, command=command)
+        if text == "Disconnect":
+            self.btn_term.pack(side="left", padx=5)
+        else:
+            self.btn_term.pack_forget()

@@ -43,23 +43,56 @@ class WazuhTab(BaseDashboardTab):
         tk.Label(self.creds_frame, text="Username: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
         tk.Label(self.creds_frame, text="Password: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
         
-        self.agent_frame = tk.Frame(self.container, bg=C["bg"])
-        self.agent_frame.pack(pady=20)
+        # Stats container
+        self.stats_container = tk.Frame(self.container, bg=C["bg"])
+        self.stats_container.pack(pady=20, fill="x", padx=40)
         
-        self.agent_lbl = tk.Label(self.agent_frame, text="Live Agents: Unknown", bg=C["bg"], fg=C["text"], font=("Helvetica", 14))
-        self.agent_lbl.pack(side="left", padx=10)
+        # Agent Stats Frame
+        tk.Label(self.stats_container, text="Agent Status", font=("Helvetica", 16, "bold"), bg=C["bg"], fg=C["text"]).pack(anchor="w", pady=(0, 10))
+        self.agents_frame = tk.Frame(self.stats_container, bg=C["bg"])
+        self.agents_frame.pack(fill="x", pady=(0, 20))
         
-        self.refresh_btn = FlatBtn(self.agent_frame, text="Refresh", bg=C["muted"], fg=C["bg"], command=self._on_refresh)
-        self.refresh_btn.pack(side="left")
+        self.agent_vars = {}
+        for metric in ["Total", "Active", "Disconnected", "Pending", "Never connected"]:
+            card = tk.Frame(self.agents_frame, bg=C["card"], highlightbackground=C["border"], highlightthickness=1, padx=15, pady=10)
+            card.pack(side="left", padx=5, fill="x", expand=True)
+            tk.Label(card, text=metric, font=("Inter", 10), bg=C["card"], fg=C["muted"]).pack()
+            var = tk.StringVar(value="-")
+            tk.Label(card, textvariable=var, font=("Helvetica", 20, "bold"), bg=C["card"], fg=C["wazuh"]).pack(pady=(5,0))
+            self.agent_vars[metric] = var
+
+        # Alert Stats Frame
+        tk.Label(self.stats_container, text="OpenSearch Alerts (Last 24h)", font=("Helvetica", 16, "bold"), bg=C["bg"], fg=C["text"]).pack(anchor="w", pady=(0, 10))
+        self.alerts_frame = tk.Frame(self.stats_container, bg=C["bg"])
+        self.alerts_frame.pack(fill="x", pady=(0, 20))
+        
+        self.alert_vars = {}
+        for metric in ["Total", "Level 12+", "Auth Failure", "Auth Success"]:
+            card = tk.Frame(self.alerts_frame, bg=C["card"], highlightbackground=C["border"], highlightthickness=1, padx=15, pady=10)
+            card.pack(side="left", padx=5, fill="x", expand=True)
+            tk.Label(card, text=metric, font=("Inter", 10), bg=C["card"], fg=C["muted"]).pack()
+            var = tk.StringVar(value="-")
+            tk.Label(card, textvariable=var, font=("Helvetica", 20, "bold"), bg=C["card"], fg=C["warn"]).pack(pady=(5,0))
+            self.alert_vars[metric] = var
+            
+        self.refresh_btn = FlatBtn(self.stats_container, text="Refresh Data", bg=C["muted"], fg=C["bg"], command=self._on_refresh)
+        self.refresh_btn.pack(pady=10)
         
     def _on_refresh(self):
         if self.refresh_callback:
-            self.agent_lbl.config(text="Live Agents: Loading...")
-            # Schedule the callback (which might be blocking or async)
+            for v in self.agent_vars.values(): v.set("...")
+            for v in self.alert_vars.values(): v.set("...")
             self.after(100, self.refresh_callback)
             
-    def set_agent_count(self, count_str):
-        self.agent_lbl.config(text=f"Live Agents: {count_str}")
+    def set_agent_stats(self, stats):
+        for k, v in stats.items():
+            if k in self.agent_vars:
+                self.agent_vars[k].set(str(v))
+                
+    def set_alert_stats(self, stats):
+        for k, v in stats.items():
+            if k in self.alert_vars:
+                self.alert_vars[k].set(str(v))
 
 class TheHiveTab(BaseDashboardTab):
     def __init__(self, parent):

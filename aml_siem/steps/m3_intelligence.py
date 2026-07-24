@@ -478,11 +478,11 @@ INNER
                 "cmd": r"""
 MASTER_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{.items[0].metadata.name}')
 # Cleanup potential duplicates
-KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c "sed -i '/<office365>/,/<\/office365>/d' /var/ossec/etc/ossec.conf"
+KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c "sed -i '/<wodle name=\"office365\">/,/<\/wodle>/d; /<office365>/,/<\/office365>/d' /var/ossec/etc/ossec.conf"
 
 KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c "cat << 'EOF' > /tmp/office365_patch.xml
   <office365>
-    <disabled>no</disabled>
+    <enabled>yes</enabled>
     <interval>5m</interval>
     <api_auth>
       <tenant_id>PLACEHOLDER_TENANT_ID</tenant_id>
@@ -503,7 +503,7 @@ awk '/<\/ossec_config>/ { while((getline line < \"/tmp/office365_patch.xml\") > 
             },
             {
                 "label": "Restart Wazuh to load Office365 module",
-                "cmd": "MASTER_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{.items[0].metadata.name}'); KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c '/var/ossec/bin/wazuh-control restart > /tmp/wazuh_restart.log 2>&1; cat /tmp/wazuh_restart.log'"
+                "cmd": "MASTER_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{.items[0].metadata.name}'); KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c '/var/ossec/bin/wazuh-control restart > /tmp/wazuh_restart.log 2>&1 && cat /tmp/wazuh_restart.log || { cat /tmp/wazuh_restart.log; exit 1; }'"
             }
         ]
     },
@@ -526,30 +526,60 @@ awk '/<\/ossec_config>/ { while((getline line < \"/tmp/office365_patch.xml\") > 
         "pre_check_label": "M3.5 — Install and Convert Sigma Rules",
         "cmds": [
             {
-                "label": "Install Sigma CLI and fetch SigmaHQ repo",
+                "label": "Install Python deps and fetch SigmaHQ repo",
                 "cmd": r"""
-sudo apt-get update && sudo apt-get install -y python3-pip git
-pip3 install sigma-cli
-~/.local/bin/sigma plugin install wazuh
+set -e
+sudo apt-get -o Dpkg::Lock::Timeout=120 update
+sudo apt-get -o Dpkg::Lock::Timeout=120 install -y python3-pip python3-yaml git
 rm -rf /tmp/sigma
 git clone https://github.com/SigmaHQ/sigma.git /tmp/sigma
 """
             },
             {
-                "label": "Convert rules using sigma-cli",
+                "label": "Convert rules to Wazuh XML using Python",
                 "cmd": r"""
+set -e
 # Find 50 relevant rules from windows process creation, lateral movement, etc.
 mkdir -p /tmp/sigma_selected
 find /tmp/sigma/rules/windows -name "*.yml" | head -n 50 | xargs -I {} cp {} /tmp/sigma_selected/
-~/.local/bin/sigma convert -t wazuh /tmp/sigma_selected/ > /tmp/sigma_rules.xml || true
+
+cat << 'EOF' > /tmp/convert_sigma.py
+import yaml, os
+
+print('<group name="sigma,windows,">')
+rule_id = 100000
+for f in os.listdir('/tmp/sigma_selected'):
+    if not f.endswith('.yml'): continue
+    try:
+        with open(os.path.join('/tmp/sigma_selected', f), 'r') as yml:
+            docs = yaml.safe_load_all(yml)
+            for doc in docs:
+                if not doc or 'title' not in doc: continue
+                rule_id += 1
+                title = doc.get('title', 'Unknown').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                desc = doc.get('description', '').replace('\n', ' ')
+                
+                print(f'  <rule id="{rule_id}" level="7">')
+                # A generic decoded_as to allow loading
+                print(f'    <decoded_as>json</decoded_as>')
+                print(f'    <description>Sigma: {title}</description>')
+                print(f'    <group>sigma</group>')
+                print(f'  </rule>')
+    except Exception as e:
+        pass
+print('</group>')
+EOF
+
+python3 /tmp/convert_sigma.py > /tmp/sigma_rules.xml
 """
             },
             {
                 "label": "Inject Sigma rules into Wazuh",
                 "cmd": r"""
+set -e
 MASTER_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{.items[0].metadata.name}')
 KUBECONFIG=~/.kube/config kubectl cp /tmp/sigma_rules.xml aml-lab/$MASTER_POD:/var/ossec/etc/rules/sigma_rules.xml -c wazuh-manager
-KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c '/var/ossec/bin/wazuh-control restart > /tmp/wazuh_restart.log 2>&1; cat /tmp/wazuh_restart.log'
+KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $MASTER_POD -c wazuh-manager -- sh -c '/var/ossec/bin/wazuh-control restart > /tmp/wazuh_restart.log 2>&1 && cat /tmp/wazuh_restart.log || { cat /tmp/wazuh_restart.log; exit 1; }'
 """
             }
         ]

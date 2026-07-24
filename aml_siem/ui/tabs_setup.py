@@ -77,10 +77,14 @@ class SetupTab(tk.Frame):
                                  activeforeground=C["text"], font=FONT_STEP)
         chk_force.pack(side="top", anchor="w", pady=(0, 10))
         
+        self.run_full_btn = FlatBtn(bot_frame, text="Run Full Deployment (M0-M5)", bg=C["accent"], command=self._on_run_full_click)
+        self.run_full_btn.pack(side="top", fill="x", pady=(0, 5))
+        
         self.run_btn = FlatBtn(bot_frame, text="Run Selected", bg=C["success"], command=self._on_run_click)
         self.run_btn.pack(side="bottom", fill="x")
 
         # Container for Scrollable checklist
+
         list_container = tk.Frame(left_pane, bg=C["surface"])
         list_container.pack(fill="both", expand=True, padx=15, pady=(15, 0))
 
@@ -131,6 +135,11 @@ class SetupTab(tk.Frame):
 
     def _on_run_click(self):
         self.on_run(force=self.force_var.get())
+
+    def _on_run_full_click(self):
+        self._select_all(True)
+        self.force_var.set(False)
+        self.on_run(force=False)
 
     def _toggle_group(self, var, sids, child_vars=None):
         val = var.get()

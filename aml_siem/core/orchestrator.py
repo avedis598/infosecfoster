@@ -19,8 +19,8 @@ class Orchestrator:
             
         self.running = True
         
-        from .config import load_config
-        cfg = load_config()
+        from .config import get_active_client_config
+        cfg = get_active_client_config()
         domain = cfg.get("cf_domain", "amlsiem.com")
         alert_email = cfg.get("alert_email", "admin@amlsiem.com")
         

@@ -10,6 +10,8 @@ from .components import C, FONT_BOLD
 from .tabs_connection import ConnectionTab
 from .tabs_setup import SetupTab
 from .tabs_dashboards import WazuhTab, TheHiveTab, ShuffleTab, GrafanaTab
+from .tabs_reports import ReportsTab
+from .tabs_clients import ClientDashboardTab
 class AMLSiemApp(tk.Tk):
     def __init__(self, steps_def):
         super().__init__()
@@ -45,6 +47,9 @@ class AMLSiemApp(tk.Tk):
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(expand=True, fill="both")
         
+        self.tab_clients = ClientDashboardTab(self.notebook, self._on_client_selected)
+        self.notebook.add(self.tab_clients, text=" Clients ")
+        
         self.tab_conn = ConnectionTab(
             self.notebook, 
             self._on_connect, 
@@ -52,42 +57,115 @@ class AMLSiemApp(tk.Tk):
             self._on_save_config,
             self._on_load_config
         )
-        self.notebook.add(self.tab_conn, text=" Connection ")
+        # Connection tab is hidden initially until a client is selected
         
         self.tab_setup = SetupTab(self.notebook, self.steps_def, self._on_run_setup)
-        self.notebook.add(self.tab_setup, text=" Setup ")
+        # Setup tab is hidden initially
         
         self.tab_wazuh = WazuhTab(self.notebook, refresh_callback=self._fetch_wazuh_agents)
         self.tab_thehive = TheHiveTab(self.notebook)
         self.tab_shuffle = ShuffleTab(self.notebook)
         self.tab_grafana = GrafanaTab(self.notebook)
+        self.tab_reports = ReportsTab(self.notebook, self.ssh)
         
-        # Load saved config
-        self._populate_config(self.config)
+        # Load saved config (will load active_client by default)
+        from ..core.config import get_active_client_config
+        self._populate_config(get_active_client_config())
+
+    def _on_client_selected(self, client_id):
+        from ..core.config import set_active_client, get_active_client_config
+        set_active_client(client_id)
+        client_conf = get_active_client_config()
+        self._populate_config(client_conf)
+        
+        # Switch tabs
+        self.notebook.forget(self.tab_clients)
+        self.notebook.insert(0, self.tab_conn, text=f" Connection: {client_conf.get('name', client_id)} ")
+        self.notebook.select(self.tab_conn)
 
     def _fetch_wazuh_agents(self):
         import threading
         def worker():
             if not self.ssh or not self.ssh.is_connected():
-                self.after(0, lambda: self.tab_wazuh.set_agent_count("Error: Not connected"))
+                err = {"Total": "Err", "Active": "Err", "Disconnected": "Err", "Pending": "Err", "Never connected": "Err"}
+                self.after(0, lambda: self.tab_wazuh.set_agent_stats(err))
+                self.after(0, lambda: self.tab_wazuh.set_alert_stats({"Total": "Err", "Level 12+": "Err", "Auth Failure": "Err", "Auth Success": "Err"}))
                 return
                 
-            cmd = "KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{.items[0].metadata.name}') -c wazuh-manager -- /var/ossec/bin/agent_control -l"
+            script = """
+import subprocess, urllib.request, json, ssl
+
+stats = {"agents": {"Total": "0", "Active": "0", "Disconnected": "0", "Pending": "0", "Never connected": "0"},
+         "alerts": {"Total": "0", "Level 12+": "0", "Auth Failure": "0", "Auth Success": "0"}}
+
+# 1. Agent Stats
+try:
+    res = subprocess.run(["/var/ossec/bin/agent_control", "-j", "-l"], capture_output=True, text=True)
+    if res.returncode == 0:
+        agent_data = json.loads(res.stdout).get("data", [])
+        valid_agents = [a for a in agent_data if a.get("id") != "000"]
+        
+        stats["agents"]["Total"] = str(len(valid_agents))
+        active, disc, pend, never = 0, 0, 0, 0
+        for agent in valid_agents:
+            st = agent.get("status", "")
+            if st == "Active": active += 1
+            elif st == "Disconnected": disc += 1
+            elif st == "Pending": pend += 1
+            elif st == "Never connected": never += 1
+        
+        stats["agents"]["Active"] = str(active)
+        stats["agents"]["Disconnected"] = str(disc)
+        stats["agents"]["Pending"] = str(pend)
+        stats["agents"]["Never connected"] = str(never)
+except Exception:
+    stats["agents"]["Total"] = "Err1"
+
+# 2. Alert Stats (Last 24h) from OpenSearch
+import datetime
+now = datetime.datetime.utcnow()
+past = now - datetime.timedelta(days=1)
+time_filter = {"range": {"@timestamp": {"gte": past.strftime("%Y-%m-%dT%H:%M:%SZ"), "lte": now.strftime("%Y-%m-%dT%H:%M:%SZ")}}}
+
+os_url = "http://opensearch-proxy.aml-lab.svc.cluster.local:9200/wazuh-alerts-*/_count"
+
+def get_count(query):
+    try:
+        req = urllib.request.Request(os_url, data=json.dumps(query).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=5) as res:
+            return str(json.loads(res.read()).get("count", 0))
+    except Exception:
+        return "Err2"
+
+stats["alerts"]["Total"] = get_count({"query": {"bool": {"filter": [time_filter]}}})
+stats["alerts"]["Level 12+"] = get_count({"query": {"bool": {"filter": [time_filter, {"range": {"rule.level": {"gte": 12}}}]}}})
+stats["alerts"]["Auth Failure"] = get_count({"query": {"bool": {"filter": [time_filter, {"match": {"rule.groups": "authentication_failed"}}]}}})
+stats["alerts"]["Auth Success"] = get_count({"query": {"bool": {"filter": [time_filter, {"match": {"rule.groups": "authentication_success"}}]}}})
+
+print(json.dumps(stats))
+"""
+            import base64
+            script_b64 = base64.b64encode(script.encode()).decode()
+            cmd = f"KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{{.items[0].metadata.name}}') -c wazuh-manager -- sh -c 'echo {script_b64} | base64 -d | python3'"
             ok, out = self.ssh.run(cmd)
+
             
             if not ok:
-                self.after(0, lambda: self.tab_wazuh.set_agent_count("Error: Command failed"))
+                err = {"Total": "Err", "Active": "Err", "Disconnected": "Err", "Pending": "Err", "Never connected": "Err"}
+                self.after(0, lambda: self.tab_wazuh.set_agent_stats(err))
+                self.after(0, lambda: self.tab_wazuh.set_alert_stats({"Total": "Err", "Level 12+": "Err", "Auth Failure": "Err", "Auth Success": "Err"}))
                 return
                 
-            # Parse output to find active external agents
-            lines = out.split("\n")
-            active_count = 0
-            for line in lines:
-                if "Active" in line and "(server)" not in line:
-                    active_count += 1
-            
-            self.after(0, lambda: self.tab_wazuh.set_agent_count(str(active_count)))
-            
+            try:
+                import json
+                data = json.loads(out)
+                self.after(0, lambda: self.tab_wazuh.set_agent_stats(data.get("agents", {})))
+                self.after(0, lambda: self.tab_wazuh.set_alert_stats(data.get("alerts", {})))
+            except Exception:
+                err = {"Total": "Parse", "Active": "Parse", "Disconnected": "Parse", "Pending": "Parse", "Never connected": "Parse"}
+                self.after(0, lambda: self.tab_wazuh.set_agent_stats(err))
+                self.after(0, lambda: self.tab_wazuh.set_alert_stats({"Total": "Parse", "Level 12+": "Parse", "Auth Failure": "Parse", "Auth Success": "Parse"}))
+                
         threading.Thread(target=worker, daemon=True).start()
 
     def _populate_config(self, config_data):
@@ -175,6 +253,9 @@ class AMLSiemApp(tk.Tk):
             self.tab_conn.set_status(f"Connected to {host}", C["success"])
             self.tab_conn.set_button("Disconnect", C["danger"], self._disconnect)
             self.orchestrator = Orchestrator(self.ssh)
+            
+            # Show Setup tab right after Connection
+            self.notebook.insert(1, self.tab_setup, text=" Setup ")
             self.notebook.select(self.tab_setup)
             
             # Show integration tabs
@@ -183,7 +264,12 @@ class AMLSiemApp(tk.Tk):
             self.notebook.add(self.tab_shuffle, text=" Shuffle ")
             self.notebook.add(self.tab_grafana, text=" Grafana ")
             
-            domain = self.config.get("cf_domain", "amlsiem.com")
+            self.tab_reports.ssh = self.ssh
+            self.notebook.add(self.tab_reports, text=" Reports ")
+            
+            from ..core.config import get_active_client_config
+            client_conf = get_active_client_config()
+            domain = client_conf.get("cf_domain", "amlsiem.com")
             
             self.tab_wazuh.set_url(f"https://wazuh.aml-lab.{domain}")
             self.tab_thehive.set_url(f"https://thehive.aml-lab.{domain}")
@@ -208,14 +294,22 @@ class AMLSiemApp(tk.Tk):
         self.tab_conn.set_status("Not Connected", C["muted"])
         self.tab_conn.set_button("Connect", C["accent"], self._on_connect)
         
-        # Hide integration tabs on disconnect
+        # Hide integration tabs and connection tab on disconnect
         try:
+            self.notebook.forget(self.tab_conn)
+            self.notebook.forget(self.tab_setup)
             self.notebook.forget(self.tab_wazuh)
             self.notebook.forget(self.tab_thehive)
             self.notebook.forget(self.tab_shuffle)
             self.notebook.forget(self.tab_grafana)
+            self.notebook.forget(self.tab_reports)
         except tk.TclError:
             pass
+            
+        # Re-insert the Client Dashboard
+        self.notebook.insert(0, self.tab_clients, text=" Clients ")
+        self.tab_clients.refresh_clients()
+        self.notebook.select(self.tab_clients)
 
     def _on_run_setup(self, force=False):
         if not self.orchestrator or not self.ssh or not self.ssh.is_connected():
