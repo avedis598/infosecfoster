@@ -1,4 +1,6 @@
 
+from .grafana_assets import DASHBOARDS_YAML, TELEMETRY_AGGREGATOR_SCRIPT, EXECUTIVE_DASHBOARD_JSON, OPERATIONAL_DASHBOARD_JSON
+
 M3_STEPS = [
     {
         "id": "3.M3.1",
@@ -150,7 +152,16 @@ chmod 640 /var/ossec/etc/rules/local_rules.xml'
         "cmds": [
             {
                 "label": "Deploy ClickHouse StatefulSet and Service",
-                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
+                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'    - name: SIEM-Telemetry
+      uid: SIEM-Telemetry
+      type: grafana-opensearch-datasource
+      url: http://opensearch.aml-lab.svc.cluster.local:9200
+      access: proxy
+      jsonData:
+        database: "siem-telemetry"
+        timeField: "timestamp"
+        version: "OpenSearch"
+INNER'
 apiVersion: v1
 kind: Service
 metadata:
@@ -330,7 +341,7 @@ INNER
         "cmds": [
             {
                 "label": "Deploy Grafana Data Sources ConfigMap",
-                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
+                "cmd": """KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -341,6 +352,7 @@ data:
     apiVersion: 1
     datasources:
     - name: OpenSearch
+      uid: OpenSearch
       type: grafana-opensearch-datasource
       url: http://opensearch.aml-lab.svc.cluster.local:9200
       access: proxy
@@ -348,18 +360,75 @@ data:
         database: "[wazuh-alerts-4.x-]YYYY.MM.DD"
         timeField: "timestamp"
         version: "OpenSearch"
-    - name: ClickHouse
-      type: grafana-clickhouse-datasource
-      url: http://clickhouse.aml-lab.svc.cluster.local:8123
-      access: proxy
-      jsonData:
-        defaultDatabase: wazuh_cold
+INNER
+"""
+            },
+            {
+                "label": "Deploy Grafana Dashboards ConfigMaps",
+                "cmd": f"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: aml-lab
+data:
+  dashboards.yaml: |
+{chr(10).join('    ' + line for line in DASHBOARDS_YAML.splitlines())}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-json
+  namespace: aml-lab
+data:
+  executive-dashboard.json: |
+{chr(10).join('    ' + line for line in EXECUTIVE_DASHBOARD_JSON.splitlines())}
+  operational-dashboard.json: |
+{chr(10).join('    ' + line for line in OPERATIONAL_DASHBOARD_JSON.splitlines())}
+INNER
+"""
+            },
+            {
+                "label": "Deploy SIEM Telemetry Aggregator",
+                "cmd": f"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telemetry-aggregator-script
+  namespace: aml-lab
+data:
+  telemetry_aggregator.py: |
+{chr(10).join('    ' + line for line in TELEMETRY_AGGREGATOR_SCRIPT.splitlines())}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: siem-telemetry-cronjob
+  namespace: aml-lab
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: aggregator
+            image: python:3.9-slim
+            command: ["python", "/scripts/telemetry_aggregator.py"]
+            volumeMounts:
+            - name: script-vol
+              mountPath: /scripts
+          volumes:
+          - name: script-vol
+            configMap:
+              name: telemetry-aggregator-script
+          restartPolicy: OnFailure
 INNER
 """
             },
             {
                 "label": "Deploy Grafana",
-                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
+                "cmd": """KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
 apiVersion: v1
 kind: Service
 metadata:
@@ -395,7 +464,7 @@ spec:
         - containerPort: 3000
         env:
         - name: GF_INSTALL_PLUGINS
-          value: grafana-opensearch-datasource,grafana-clickhouse-datasource
+          value: grafana-opensearch-datasource,grafana-clickhouse-datasource,marcusolsson-json-datasource
         - name: GF_AUTH_ANONYMOUS_ENABLED
           value: "true"
         - name: GF_AUTH_ANONYMOUS_ORG_ROLE
@@ -404,10 +473,21 @@ spec:
         - name: grafana-datasources
           mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
           subPath: datasources.yaml
+        - name: grafana-dashboards-provider
+          mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+          subPath: dashboards.yaml
+        - name: grafana-dashboards-json
+          mountPath: /var/lib/grafana/dashboards
       volumes:
       - name: grafana-datasources
         configMap:
           name: grafana-datasources
+      - name: grafana-dashboards-provider
+        configMap:
+          name: grafana-dashboards-provider
+      - name: grafana-dashboards-json
+        configMap:
+          name: grafana-dashboards-json
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -449,8 +529,7 @@ spec:
 INNER
 """
             }
-        ]
-    },
+        ]    },
     {
         "id": "3.GATE_M33",
         "title": "Gate Verification — M3.3 Grafana",

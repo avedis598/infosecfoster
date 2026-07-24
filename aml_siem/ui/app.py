@@ -78,9 +78,9 @@ class AMLSiemApp(tk.Tk):
         client_conf = get_active_client_config()
         self._populate_config(client_conf)
         
-        # Switch tabs
-        self.notebook.forget(self.tab_clients)
+        # Switch tabs - insert before forgetting to prevent TclError empty notebook on Windows
         self.notebook.insert(0, self.tab_conn, text=f" Connection: {client_conf.get('name', client_id)} ")
+        self.notebook.forget(self.tab_clients)
         self.notebook.select(self.tab_conn)
 
     def _fetch_wazuh_agents(self):
@@ -263,9 +263,8 @@ print(json.dumps(stats))
             self.notebook.add(self.tab_thehive, text=" TheHive ")
             self.notebook.add(self.tab_shuffle, text=" Shuffle ")
             self.notebook.add(self.tab_grafana, text=" Grafana ")
-            
-            self.tab_reports.ssh = self.ssh
             self.notebook.add(self.tab_reports, text=" Reports ")
+            self.tab_reports.ssh = self.ssh
             
             from ..core.config import get_active_client_config
             client_conf = get_active_client_config()
@@ -274,7 +273,10 @@ print(json.dumps(stats))
             self.tab_wazuh.set_url(f"https://wazuh.aml-lab.{domain}")
             self.tab_thehive.set_url(f"https://thehive.aml-lab.{domain}")
             self.tab_shuffle.set_url(f"https://shuffle.aml-lab.{domain}")
-            self.tab_grafana.set_url(f"https://grafana.aml-lab.{domain}")
+            self.tab_grafana.set_urls(
+                exec_url=f"https://grafana.aml-lab.{domain}/d/executive",
+                ops_url=f"https://grafana.aml-lab.{domain}/d/operational"
+            )
             
             # Trigger initial fetch
             self._fetch_wazuh_agents()
@@ -294,6 +296,11 @@ print(json.dumps(stats))
         self.tab_conn.set_status("Not Connected", C["muted"])
         self.tab_conn.set_button("Connect", C["accent"], self._on_connect)
         
+        # Back to clients - insert before forgetting to prevent TclError empty notebook on Windows
+        self.notebook.insert(0, self.tab_clients, text=" Clients ")
+        self.tab_clients.refresh_clients()
+        self.notebook.select(self.tab_clients)
+
         # Hide integration tabs and connection tab on disconnect
         try:
             self.notebook.forget(self.tab_conn)
@@ -303,12 +310,8 @@ print(json.dumps(stats))
             self.notebook.forget(self.tab_shuffle)
             self.notebook.forget(self.tab_grafana)
             self.notebook.forget(self.tab_reports)
-        except tk.TclError:
+        except Exception:
             pass
-            
-        # Re-insert the Client Dashboard
-        self.notebook.insert(0, self.tab_clients, text=" Clients ")
-        self.tab_clients.refresh_clients()
         self.notebook.select(self.tab_clients)
 
     def _on_run_setup(self, force=False):
