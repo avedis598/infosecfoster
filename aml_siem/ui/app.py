@@ -113,6 +113,9 @@ try:
     req = urllib.request.Request(f"{shuffle_url}/api/v1/apps", headers=headers)
     res = urllib.request.urlopen(req, timeout=10)
     apps = json.loads(res.read())
+except urllib.error.HTTPError as e:
+    print(f"Failed to fetch apps. HTTP {e.code}: {e.read().decode()}")
+    sys.exit(1)
 except Exception as e:
     print(f"Failed to fetch apps: {e}")
     sys.exit(1)
