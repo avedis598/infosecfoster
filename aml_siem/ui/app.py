@@ -119,18 +119,47 @@ workflow_b64 = "{workflow_b64}"
 workflow_json = base64.b64decode(workflow_b64).decode()
 workflow = json.loads(workflow_json)
 
-# Dynamically map App IDs
+print(f"--- DEBUG: Original Workflow ---")
+print(f"Name: {{workflow.get('name')}}")
+print(f"Actions count: {{len(workflow.get('actions', []))}}")
+
+# Dynamically map App IDs for actions
 for action in workflow.get("actions", []):
     app_name = action.get("app_name")
     if app_name:
         matched_app = next((a for a in apps if a.get("name") == app_name), None)
         if matched_app:
+            print(f"DEBUG: Mapped Action App '{{app_name}}' to ID '{{matched_app['id']}}'")
             action["app_id"] = matched_app["id"]
             action["app_version"] = matched_app["app_version"]
+        else:
+            print(f"DEBUG: WARNING! Could not find Action App '{{app_name}}' in cluster! This may cause deploy failure.")
+
+# Dynamically map App IDs for triggers
+for trigger in workflow.get("triggers", []):
+    app_name = trigger.get("app_name")
+    if app_name:
+        matched_app = next((a for a in apps if a.get("name") == app_name), None)
+        if matched_app:
+            print(f"DEBUG: Mapped Trigger App '{{app_name}}' to ID '{{matched_app['id']}}'")
+            trigger["app_id"] = matched_app["id"]
+            trigger["app_version"] = matched_app["app_version"]
+
+# Remove org_id which can cause {"success": false} if it belongs to another cluster
+if "org_id" in workflow:
+    print(f"DEBUG: Removing hardcoded org_id '{{workflow['org_id']}}'")
+    del workflow["org_id"]
+
+print(f"--- DEBUG: Final Payload ---")
+payload_str = json.dumps(workflow, indent=2)
+# Print first 500 chars to avoid massive logs if not needed, or print all
+print(payload_str[:1500] + "...(truncated)")
 
 try:
     req = urllib.request.Request(f"{{shuffle_url}}/api/v1/workflows", data=json.dumps(workflow).encode(), headers=headers, method="POST")
     res = urllib.request.urlopen(req, timeout=10)
+    res_body = res.read().decode()
+    print(f"DEBUG: Response body: {{res_body}}")
     print("SUCCESS")
 except urllib.error.HTTPError as e:
     print(f"Failed to deploy workflow: {{e.read().decode()}}")
