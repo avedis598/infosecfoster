@@ -97,10 +97,21 @@ class AMLSiemApp(tk.Tk):
         bundled_apps = []
         if os.path.exists("apps"):
             for f in os.listdir("apps"):
-                if f.endswith(".json"):
+                if f.endswith(".json") or f.endswith(".yaml") or f.endswith(".yml"):
                     try:
                         with open(os.path.join("apps", f), "r") as app_f:
-                            bundled_apps.append(base64.b64encode(app_f.read().encode()).decode())
+                            content = app_f.read()
+                            
+                            # Convert YAML to JSON since Shuffle API strictly expects JSON
+                            if f.endswith(".yaml") or f.endswith(".yml"):
+                                try:
+                                    import yaml
+                                    content = json.dumps(yaml.safe_load(content))
+                                except ImportError:
+                                    messagebox.showwarning("Missing Dependency", f"Cannot load '{f}' because PyYAML is not installed. Please run 'pip install pyyaml' or convert the file to JSON.")
+                                    continue
+                                    
+                            bundled_apps.append(base64.b64encode(content.encode()).decode())
                     except Exception as e:
                         print(f"Failed to read bundled app {f}: {e}")
         
