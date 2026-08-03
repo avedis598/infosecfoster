@@ -1,5 +1,5 @@
 
-from .grafana_assets import DASHBOARDS_YAML, TELEMETRY_AGGREGATOR_SCRIPT, EXECUTIVE_DASHBOARD_JSON, OPERATIONAL_DASHBOARD_JSON
+from .grafana_assets import DASHBOARDS_YAML, TELEMETRY_AGGREGATOR_SCRIPT, OVERVIEW_DASHBOARD_JSON, ALERTS_DASHBOARD_JSON
 
 M3_STEPS = [
     {
@@ -357,9 +357,30 @@ data:
       url: http://opensearch.aml-lab.svc.cluster.local:9200
       access: proxy
       jsonData:
-        database: "[wazuh-alerts-4.x-]YYYY.MM.DD"
+        database: "wazuh-alerts-*"
         timeField: "timestamp"
-        version: "OpenSearch"
+        version: "2.13.0"
+    - name: SIEM-Telemetry
+      uid: SIEM-Telemetry
+      type: grafana-opensearch-datasource
+      url: http://opensearch.aml-lab.svc.cluster.local:9200
+      access: proxy
+      jsonData:
+        database: "siem-telemetry"
+        timeField: "timestamp"
+        version: "2.13.0"
+    - name: TheHive
+      uid: TheHive
+      type: yesoreyeram-infinity-datasource
+      url: http://thehive.aml-lab.svc.cluster.local:9000/api/v1
+      access: proxy
+      secureJsonData:
+        httpHeaderValue1: "Bearer ${THEHIVE_API_KEY}"
+        httpHeaderValue2: "application/json"
+      jsonData:
+        httpHeaderName1: "Authorization"
+        httpHeaderName2: "Content-Type"
+        global_queries: []
 INNER
 """
             },
@@ -381,10 +402,10 @@ metadata:
   name: grafana-dashboards-json
   namespace: aml-lab
 data:
-  executive-dashboard.json: |
-{chr(10).join('    ' + line for line in EXECUTIVE_DASHBOARD_JSON.splitlines())}
-  operational-dashboard.json: |
-{chr(10).join('    ' + line for line in OPERATIONAL_DASHBOARD_JSON.splitlines())}
+  unified-dashboard.json: |
+{chr(10).join('    ' + line for line in OVERVIEW_DASHBOARD_JSON.splitlines())}
+  alerts-dashboard.json: |
+{chr(10).join('    ' + line for line in ALERTS_DASHBOARD_JSON.splitlines())}
 INNER
 """
             },
@@ -464,11 +485,16 @@ spec:
         - containerPort: 3000
         env:
         - name: GF_INSTALL_PLUGINS
-          value: grafana-opensearch-datasource,grafana-clickhouse-datasource,marcusolsson-json-datasource
+          value: grafana-opensearch-datasource,grafana-clickhouse-datasource,marcusolsson-json-datasource,yesoreyeram-infinity-datasource
         - name: GF_AUTH_ANONYMOUS_ENABLED
           value: "true"
         - name: GF_AUTH_ANONYMOUS_ORG_ROLE
           value: Admin
+        - name: THEHIVE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: thehive-api-key
+              key: api-key
         volumeMounts:
         - name: grafana-datasources
           mountPath: /etc/grafana/provisioning/datasources/datasources.yaml

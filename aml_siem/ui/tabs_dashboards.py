@@ -114,43 +114,20 @@ class GrafanaTab(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent, bg=C["bg"])
         
-        self.sub_notebook = ttk.Notebook(self)
-        self.sub_notebook.pack(expand=True, fill="both")
+        self.title = tk.Label(self, text="Unified SIEM Dashboard", font=("Helvetica", 24, "bold"), bg=C["bg"], fg=C["warn"])
+        self.title.pack(pady=40)
         
-        # Exec Tab
-        self.exec_frame = tk.Frame(self.sub_notebook, bg=C["bg"])
-        self.sub_notebook.add(self.exec_frame, text=" Executive Dashboard ")
+        self.url_lbl = tk.Label(self, text="Not available", font=("Helvetica", 14), bg=C["bg"], fg=C["text"])
+        self.url_lbl.pack(pady=10)
         
-        self.exec_title = tk.Label(self.exec_frame, text="Executive Dashboard", font=("Helvetica", 24, "bold"), bg=C["bg"], fg=C["warn"])
-        self.exec_title.pack(pady=20)
-        self.exec_url_lbl = tk.Label(self.exec_frame, text="Not available", font=("Helvetica", 14), bg=C["bg"], fg=C["text"])
-        self.exec_url_lbl.pack(pady=10)
-        self.exec_btn = FlatBtn(self.exec_frame, text="Open in Browser", bg=C["warn"], fg=C["bg"], command=lambda: self._open_url(self.exec_url))
-        self.exec_btn.pack(pady=20)
+        self.btn = FlatBtn(self, text="Open in Browser", bg=C["warn"], fg=C["bg"], command=lambda: self._open_url(self.url))
+        self.btn.pack(pady=20)
         
-        tk.Label(self.exec_frame, text="Client Facing Executive View", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        tk.Label(self, text="Consolidated Executive & Operational Views", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
 
-        # Ops Tab
-        self.ops_frame = tk.Frame(self.sub_notebook, bg=C["bg"])
-        self.sub_notebook.add(self.ops_frame, text=" Operational Dashboard ")
-        
-        self.ops_title = tk.Label(self.ops_frame, text="Operational Dashboard", font=("Helvetica", 24, "bold"), bg=C["bg"], fg=C["accent"])
-        self.ops_title.pack(pady=20)
-        self.ops_url_lbl = tk.Label(self.ops_frame, text="Not available", font=("Helvetica", 14), bg=C["bg"], fg=C["text"])
-        self.ops_url_lbl.pack(pady=10)
-        self.ops_btn = FlatBtn(self.ops_frame, text="Open in Browser", bg=C["accent"], fg=C["bg"], command=lambda: self._open_url(self.ops_url))
-        self.ops_btn.pack(pady=20)
-        
-        tk.Label(self.ops_frame, text="IT Manager View", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
-
-        self.exec_url = ""
-        self.ops_url = ""
-
-    def set_urls(self, exec_url, ops_url):
-        self.exec_url = exec_url
-        self.ops_url = ops_url
-        self.exec_url_lbl.config(text=exec_url)
-        self.ops_url_lbl.config(text=ops_url)
+    def set_urls(self, url):
+        self.url = url
+        self.url_lbl.config(text=f"URL: {url}")
 
     def _open_url(self, url):
         import webbrowser

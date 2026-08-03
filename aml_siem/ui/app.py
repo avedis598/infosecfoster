@@ -12,6 +12,7 @@ from .tabs_setup import SetupTab
 from .tabs_dashboards import WazuhTab, TheHiveTab, ShuffleTab, GrafanaTab
 from .tabs_reports import ReportsTab
 from .tabs_clients import ClientDashboardTab
+from .tabs_overview import OverviewTab
 class AMLSiemApp(tk.Tk):
     def __init__(self, steps_def):
         super().__init__()
@@ -62,6 +63,7 @@ class AMLSiemApp(tk.Tk):
         self.tab_setup = SetupTab(self.notebook, self.steps_def, self._on_run_setup)
         # Setup tab is hidden initially
         
+        self.tab_overview = OverviewTab(self.notebook, refresh_callback=self._fetch_overview)
         self.tab_wazuh = WazuhTab(self.notebook, refresh_callback=self._fetch_wazuh_agents)
         self.tab_thehive = TheHiveTab(self.notebook)
         self.tab_shuffle = ShuffleTab(self.notebook)
@@ -82,6 +84,66 @@ class AMLSiemApp(tk.Tk):
         self.notebook.insert(0, self.tab_conn, text=f" Connection: {client_conf.get('name', client_id)} ")
         self.notebook.forget(self.tab_clients)
         self.notebook.select(self.tab_conn)
+
+    def _fetch_overview(self):
+        import threading
+        def worker():
+            if not self.ssh or not self.ssh.is_connected():
+                self.after(0, lambda: self.tab_overview.set_data([], [], error="Not connected"))
+                return
+            
+            script = """
+import subprocess, json
+try:
+    res = subprocess.run(["/usr/local/bin/kubectl", "get", "pods", "-n", "aml-lab", "-o", "json"], capture_output=True, text=True, env={"KUBECONFIG": "/home/amlak-siem-admin/.kube/config"})
+    if res.returncode != 0:
+        print(json.dumps({"error": res.stderr}))
+        exit(0)
+    data = json.loads(res.stdout)
+    pods = []
+    tools = set()
+    for item in data.get("items", []):
+        p_name = item.get("metadata", {}).get("name", "Unknown")
+        status = item.get("status", {}).get("phase", "Unknown")
+        
+        c_names = []
+        for c in item.get("spec", {}).get("containers", []):
+            c_names.append(c.get("name", ""))
+            img = c.get("image", "")
+            if img:
+                if ":" in img:
+                    name, tag = img.rsplit(":", 1)
+                else:
+                    name, tag = img, "latest"
+                tools.add((name, tag))
+                
+        pods.append({"name": p_name, "status": status, "containers": c_names})
+        
+    versions = [{"name": n, "version": t} for n, t in sorted(list(tools))]
+    print(json.dumps({"pods": pods, "versions": versions}))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+"""
+            import base64
+            script_b64 = base64.b64encode(script.encode()).decode()
+            cmd = f"echo {script_b64} | base64 -d | python3"
+            ok, out = self.ssh.run(cmd)
+            
+            if not ok:
+                self.after(0, lambda: self.tab_overview.set_data([], [], error="SSH command failed"))
+                return
+                
+            try:
+                import json
+                data = json.loads(out)
+                if "error" in data:
+                    self.after(0, lambda: self.tab_overview.set_data([], [], error=data["error"]))
+                else:
+                    self.after(0, lambda: self.tab_overview.set_data(data.get("pods", []), data.get("versions", [])))
+            except Exception as e:
+                self.after(0, lambda: self.tab_overview.set_data([], [], error=f"Parse error: {e}"))
+                
+        threading.Thread(target=worker, daemon=True).start()
 
     def _fetch_wazuh_agents(self):
         import threading
@@ -259,6 +321,7 @@ print(json.dumps(stats))
             self.notebook.select(self.tab_setup)
             
             # Show integration tabs
+            self.notebook.add(self.tab_overview, text=" Overview ")
             self.notebook.add(self.tab_wazuh, text=" Wazuh ")
             self.notebook.add(self.tab_thehive, text=" TheHive ")
             self.notebook.add(self.tab_shuffle, text=" Shuffle ")
@@ -274,11 +337,11 @@ print(json.dumps(stats))
             self.tab_thehive.set_url(f"https://thehive.aml-lab.{domain}")
             self.tab_shuffle.set_url(f"https://shuffle.aml-lab.{domain}")
             self.tab_grafana.set_urls(
-                exec_url=f"https://grafana.aml-lab.{domain}/d/executive",
-                ops_url=f"https://grafana.aml-lab.{domain}/d/operational"
+                url=f"https://grafana.aml-lab.{domain}/d/unified/unified-siem-dashboard"
             )
             
-            # Trigger initial fetch
+            # Trigger initial fetches
+            self._fetch_overview()
             self._fetch_wazuh_agents()
         else:
             self.tab_conn.set_status("Connection Failed", C["danger"])
@@ -305,6 +368,7 @@ print(json.dumps(stats))
         try:
             self.notebook.forget(self.tab_conn)
             self.notebook.forget(self.tab_setup)
+            self.notebook.forget(self.tab_overview)
             self.notebook.forget(self.tab_wazuh)
             self.notebook.forget(self.tab_thehive)
             self.notebook.forget(self.tab_shuffle)
