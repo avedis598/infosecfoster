@@ -92,7 +92,17 @@ try:
     req = urllib.request.Request(f"{shuffle_url}/api/v1/users/login", data=json.dumps({"username": "admin", "password": "Admin1234!"}).encode(), headers={"Content-Type": "application/json"})
     res = urllib.request.urlopen(req, timeout=10)
     data = json.loads(res.read())
-    token = data.get("cookies", [{}])[0].get("value", "")
+    token = data.get("apikey", "")
+    if not token:
+        token = data.get("session_token", "")
+    if not token:
+        try:
+            token = data.get("cookies", [{}])[0].get("value", "")
+        except:
+            token = ""
+    if not token:
+        print(f"Login succeeded but no token found. Response: {data}")
+        sys.exit(1)
 except Exception as e:
     print(f"Login failed: {e}")
     sys.exit(1)
