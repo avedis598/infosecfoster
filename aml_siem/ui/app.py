@@ -94,6 +94,18 @@ class AMLSiemApp(tk.Tk):
             messagebox.showerror("Error", f"Failed to read template: {e}")
             return
 
+        bundled_apps = []
+        if os.path.exists("apps"):
+            for f in os.listdir("apps"):
+                if f.endswith(".json"):
+                    try:
+                        with open(os.path.join("apps", f), "r") as app_f:
+                            bundled_apps.append(base64.b64encode(app_f.read().encode()).decode())
+                    except Exception as e:
+                        print(f"Failed to read bundled app {f}: {e}")
+        
+        bundled_apps_str = "[\n" + ",\n".join(f'"{a}"' for a in bundled_apps) + "\n]"
+
         messagebox.showinfo("Installing Playbook", f"Deploying {playbook_filename} in the background. Please wait.")
         import threading
         def worker():
@@ -103,6 +115,18 @@ import urllib.request, json, ssl, sys, uuid, base64
 shuffle_url = "http://shuffle-backend.aml-lab.svc.cluster.local:5001"
 api_key = "{shuffle_api_key}"
 headers = {{"Authorization": f"Bearer {{api_key}}", "Content-Type": "application/json"}}
+
+bundled_apps_b64 = {bundled_apps_str}
+for b64 in bundled_apps_b64:
+    app_json = base64.b64decode(b64).decode()
+    try:
+        install_req = urllib.request.Request(f"{{shuffle_url}}/api/v1/apps", data=app_json.encode(), headers=headers, method="POST")
+        install_res = urllib.request.urlopen(install_req, timeout=10)
+        print("DEBUG: Successfully auto-installed bundled app")
+    except urllib.error.HTTPError as e:
+        print(f"DEBUG: Bundled app auto-install skipped/failed: {{e.read().decode()[:200]}}")
+    except Exception as e:
+        print(f"DEBUG: Bundled app auto-install error: {{e}}")
 
 try:
     req = urllib.request.Request(f"{{shuffle_url}}/api/v1/apps", headers=headers)
