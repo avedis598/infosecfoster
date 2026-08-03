@@ -134,19 +134,19 @@ else:
 for action in workflow.get("actions", []):
     app_name = action.get("app_name")
     if app_name:
-        matched_app = next((a for a in apps if a.get("name") == app_name), None)
+        matched_app = next((a for a in apps if a.get("name", "").lower() == app_name.lower()), None)
         if matched_app:
             print(f"DEBUG: Mapped Action App '{{app_name}}' to ID '{{matched_app['id']}}'")
             action["app_id"] = matched_app["id"]
             action["app_version"] = matched_app["app_version"]
         else:
-            print(f"DEBUG: WARNING! Could not find Action App '{{app_name}}' in cluster! This may cause deploy failure.")
+            print(f"DEBUG: WARNING! Could not find Action App '{{app_name}}' (case-insensitive) in cluster! This may cause deploy failure.")
 
 # Dynamically map App IDs for triggers
 for trigger in workflow.get("triggers", []):
     app_name = trigger.get("app_name")
     if app_name:
-        matched_app = next((a for a in apps if a.get("name") == app_name), None)
+        matched_app = next((a for a in apps if a.get("name", "").lower() == app_name.lower()), None)
         if matched_app:
             print(f"DEBUG: Mapped Trigger App '{{app_name}}' to ID '{{matched_app['id']}}'")
             trigger["app_id"] = matched_app["id"]
