@@ -1,0 +1,144 @@
+{
+  "name": "PB01 - Brute Force Detection and Block",
+  "description": "Playbook 1: Automatically blocks SSH brute force attackers using Wazuh Active Response, logs a case in TheHive, and alerts the IT team via SMTP.",
+  "actions": [
+    {
+      "id": "1deed149-099b-48db-828b-9348f205f8d2",
+      "name": "Wazuh Active Response",
+      "app_name": "Wazuh",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 150
+      },
+      "parameters": [
+        {
+          "name": "command",
+          "value": "firewall-drop"
+        },
+        {
+          "name": "arguments",
+          "value": "[\"$exec.text.data.srcip\"]"
+        },
+        {
+          "name": "agent_id",
+          "value": "$exec.text.agent.id"
+        }
+      ],
+      "large_image": "",
+      "priority": 0
+    },
+    {
+      "id": "42b6e534-bb18-4efa-bcd0-582131fec0dc",
+      "name": "Create TheHive Case",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 300
+      },
+      "parameters": [
+        {
+          "name": "title",
+          "value": "Brute Force Attack Detected: Blocked Source IP ($exec.text.data.srcip)"
+        },
+        {
+          "name": "description",
+          "value": "System telemetry registered SSH brute force. Source IP has been blocked at the agent firewall.\n\n- Attacker IP: $exec.text.data.srcip\n- Agent Host: $exec.text.agent.name\n- Rule ID: $exec.text.rule.id\n- Timestamp: $exec.text.timestamp"
+        },
+        {
+          "name": "severity",
+          "value": "3"
+        },
+        {
+          "name": "tags",
+          "value": "[\"brute-force\", \"active-response\", \"sshd\"]"
+        }
+      ],
+      "large_image": "",
+      "priority": 0
+    },
+    {
+      "id": "1d15c1cc-bc3d-4d68-aff5-ce056847951a",
+      "name": "Send Alert Email",
+      "app_name": "Email",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 450
+      },
+      "parameters": [
+        {
+          "name": "recipient",
+          "value": "admin@amlsiem.com"
+        },
+        {
+          "name": "subject",
+          "value": "CRITICAL: Brute Force Blocked on $exec.text.agent.name"
+        },
+        {
+          "name": "body",
+          "value": "A brute force attack was detected and successfully blocked.\n\nAttacker IP: $exec.text.data.srcip\nTarget Agent: $exec.text.agent.name\n\nPlease review TheHive for case details."
+        }
+      ],
+      "large_image": "",
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    {
+      "id": "2ec509a2-d63f-480b-aa42-9385a7ccc386",
+      "name": "Wazuh Webhook",
+      "app_name": "Webhook",
+      "type": "webhook",
+      "position": {
+        "x": 50,
+        "y": 300
+      },
+      "parameters": []
+    }
+  ],
+  "branches": [
+    {
+      "id": "0854c626-e309-4f0b-b353-e6682c4b2fe7",
+      "source_id": "2ec509a2-d63f-480b-aa42-9385a7ccc386",
+      "destination_id": "1deed149-099b-48db-828b-9348f205f8d2",
+      "conditions": [
+        {
+          "condition": "matches regex",
+          "source": "$exec.text.rule.id",
+          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+        }
+      ]
+    },
+    {
+      "id": "a30fcec6-6174-4d84-92d9-e989e7a0aa7e",
+      "source_id": "2ec509a2-d63f-480b-aa42-9385a7ccc386",
+      "destination_id": "42b6e534-bb18-4efa-bcd0-582131fec0dc",
+      "conditions": [
+        {
+          "condition": "matches regex",
+          "source": "$exec.text.rule.id",
+          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+        }
+      ]
+    },
+    {
+      "id": "94f037b2-b688-4084-8bd8-d649e8be56de",
+      "source_id": "2ec509a2-d63f-480b-aa42-9385a7ccc386",
+      "destination_id": "1d15c1cc-bc3d-4d68-aff5-ce056847951a",
+      "conditions": [
+        {
+          "condition": "matches regex",
+          "source": "$exec.text.rule.id",
+          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+        }
+      ]
+    }
+  ],
+  "object_type": "workflow",
+  "id": "43cd1f69-2c57-40a6-aa87-b3b344891264",
+  "org_id": "",
+  "execution_argument": "",
+  "is_valid": true
+}

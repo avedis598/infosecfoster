@@ -74,95 +74,63 @@ class AMLSiemApp(tk.Tk):
         from ..core.config import get_active_client_config
         self._populate_config(get_active_client_config())
 
-    def _install_pb01(self):
+    def _install_playbook(self, playbook_filename):
         if not self.ssh or not self.ssh.is_connected():
             messagebox.showerror("Error", "Connect to the cluster first via the Connection tab.")
             return
 
-        messagebox.showinfo("Installing PB01", "Starting PB01 playbook installation in the background. Please wait.")
+        shuffle_api_key = self.tab_conn.shuffle_api_key_var.get().strip()
+        if not shuffle_api_key:
+            messagebox.showerror("Error", "Please enter the Shuffle API Key in the Connection tab.")
+            return
+
+        import os, json
+        pb_path = os.path.join("playbooks", playbook_filename)
+        try:
+            with open(pb_path, "r") as f:
+                workflow_json = f.read()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read template: {e}")
+            return
+
+        messagebox.showinfo("Installing Playbook", f"Deploying {playbook_filename} in the background. Please wait.")
         import threading
         def worker():
-            script = """
+            script = f"""
 import urllib.request, json, ssl, sys, uuid
 
-def get_uuid(): return str(uuid.uuid4())
 shuffle_url = "http://shuffle-backend.aml-lab.svc.cluster.local:5001"
+api_key = "{shuffle_api_key}"
+headers = {{"Authorization": f"Bearer {{api_key}}", "Content-Type": "application/json"}}
 
 try:
-    req = urllib.request.Request(f"{shuffle_url}/api/v1/users/login", data=json.dumps({"username": "admin", "password": "Admin1234!"}).encode(), headers={"Content-Type": "application/json"})
-    res = urllib.request.urlopen(req, timeout=10)
-    data = json.loads(res.read())
-    token = data.get("apikey", "")
-    if not token:
-        token = data.get("session_token", "")
-    if not token:
-        try:
-            token = data.get("cookies", [{}])[0].get("value", "")
-        except:
-            token = ""
-    if not token:
-        print(f"Login succeeded but no token found. Response: {data}")
-        sys.exit(1)
-except Exception as e:
-    print(f"Login failed: {e}")
-    sys.exit(1)
-
-headers = {"Authorization": f"Bearer {token}", "Cookie": f"session_token={token}", "Content-Type": "application/json"}
-
-try:
-    req = urllib.request.Request(f"{shuffle_url}/api/v1/apps", headers=headers)
+    req = urllib.request.Request(f"{{shuffle_url}}/api/v1/apps", headers=headers)
     res = urllib.request.urlopen(req, timeout=10)
     apps = json.loads(res.read())
 except urllib.error.HTTPError as e:
-    print(f"Failed to fetch apps. HTTP {e.code}: {e.read().decode()}")
+    print(f"Failed to fetch apps. HTTP {{e.code}}: {{e.read().decode()}}")
     sys.exit(1)
 except Exception as e:
-    print(f"Failed to fetch apps: {e}")
+    print(f"Failed to fetch apps: {{e}}")
     sys.exit(1)
 
-wazuh_app = next((a for a in apps if a.get("name") == "Wazuh"), None)
-thehive_app = next((a for a in apps if a.get("name") == "TheHive"), None)
-email_app = next((a for a in apps if a.get("name") == "Email"), None)
+workflow = json.loads('''{workflow_json}''')
 
-trigger_id = get_uuid()
-wazuh_id = get_uuid()
-thehive_id = get_uuid()
-email_id = get_uuid()
-
-wazuh_block = {"id": wazuh_id, "name": "Wazuh Active Response", "app_name": "Wazuh", "position": {"x": 300, "y": 150}, "parameters": [{"name": "command", "value": "firewall-drop"}, {"name": "arguments", "value": "[\\\"$exec.text.data.srcip\\\"]"}, {"name": "agent_id", "value": "$exec.text.agent.id"}]}
-if wazuh_app:
-    wazuh_block["app_id"] = wazuh_app["id"]
-    wazuh_block["app_version"] = wazuh_app["app_version"]
-
-thehive_block = {"id": thehive_id, "name": "Create TheHive Case", "app_name": "TheHive", "position": {"x": 300, "y": 300}, "parameters": [{"name": "title", "value": "Brute Force Attack Detected: Blocked Source IP ($exec.text.data.srcip)"}, {"name": "description", "value": "Attacker IP: $exec.text.data.srcip\\nAgent Host: $exec.text.agent.name\\nRule ID: $exec.text.rule.id"}, {"name": "severity", "value": "3"}, {"name": "tags", "value": "[\\\"brute-force\\\", \\\"active-response\\\", \\\"sshd\\\"]"}]}
-if thehive_app:
-    thehive_block["app_id"] = thehive_app["id"]
-    thehive_block["app_version"] = thehive_app["app_version"]
-
-email_block = {"id": email_id, "name": "Send Alert Email", "app_name": "Email", "position": {"x": 300, "y": 450}, "parameters": [{"name": "recipient", "value": "admin@amlsiem.com"}, {"name": "subject", "value": "CRITICAL: Brute Force Blocked on $exec.text.agent.name"}, {"name": "body", "value": "Attacker IP: $exec.text.data.srcip\\nTarget Agent: $exec.text.agent.name\\n\\nPlease review TheHive for case details."}]}
-if email_app:
-    email_block["app_id"] = email_app["id"]
-    email_block["app_version"] = email_app["app_version"]
-
-workflow = {
-  "name": "PB01 - Brute Force Detection and Block",
-  "description": "Playbook 1: Automatically blocks SSH brute force attackers.",
-  "id": get_uuid(),
-  "actions": [wazuh_block, thehive_block, email_block],
-  "triggers": [{"id": trigger_id, "name": "Wazuh Webhook", "app_name": "Webhook", "type": "webhook", "position": {"x": 50, "y": 300}, "parameters": []}],
-  "branches": [
-    {"id": get_uuid(), "source_id": trigger_id, "destination_id": wazuh_id, "conditions": [{"condition": "matches regex", "source": "$exec.text.rule.id", "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"}]},
-    {"id": get_uuid(), "source_id": trigger_id, "destination_id": thehive_id, "conditions": [{"condition": "matches regex", "source": "$exec.text.rule.id", "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"}]},
-    {"id": get_uuid(), "source_id": trigger_id, "destination_id": email_id, "conditions": [{"condition": "matches regex", "source": "$exec.text.rule.id", "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"}]}
-  ]
-}
+# Dynamically map App IDs
+for action in workflow.get("actions", []):
+    app_name = action.get("app_name")
+    if app_name:
+        matched_app = next((a for a in apps if a.get("name") == app_name), None)
+        if matched_app:
+            action["app_id"] = matched_app["id"]
+            action["app_version"] = matched_app["app_version"]
 
 try:
-    req = urllib.request.Request(f"{shuffle_url}/api/v1/workflows", data=json.dumps(workflow).encode(), headers=headers, method="POST")
+    req = urllib.request.Request(f"{{shuffle_url}}/api/v1/workflows", data=json.dumps(workflow).encode(), headers=headers, method="POST")
     res = urllib.request.urlopen(req, timeout=10)
     print("SUCCESS")
 except urllib.error.HTTPError as e:
-    print(f"Failed to create workflow: {e.read().decode()}")
+    print(f"Failed to deploy workflow: {{e.read().decode()}}")
 """
             import base64
             script_b64 = base64.b64encode(script.encode()).decode()
@@ -170,9 +138,9 @@ except urllib.error.HTTPError as e:
             ok, out = self.ssh.run(cmd)
             
             if ok and "SUCCESS" in out:
-                self.after(0, lambda: messagebox.showinfo("Success", "PB01 Playbook successfully installed into Shuffle SOAR!"))
+                self.after(0, lambda: messagebox.showinfo("Success", f"{playbook_filename} successfully installed into Shuffle SOAR!"))
             else:
-                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook:\\n{out}"))
+                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook:\\n{{out}}"))
                 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -340,6 +308,7 @@ print(json.dumps(stats))
         if "cf_token" in config_data: self.tab_conn.cf_token_var.set(config_data["cf_token"])
         if "cf_zone" in config_data: self.tab_conn.cf_zone_var.set(config_data["cf_zone"])
         if "alert_email" in config_data: self.tab_conn.alert_email_var.set(config_data["alert_email"])
+        if "shuffle_api_key" in config_data: self.tab_conn.shuffle_api_key_var.set(config_data["shuffle_api_key"])
 
     def _drain_queue(self):
         """Safely apply UI updates coming from the background orchestrator."""
@@ -370,7 +339,8 @@ print(json.dumps(stats))
             "key_path": self.tab_conn.key_var.get(),
             "cf_token": self.tab_conn.cf_token_var.get(),
             "cf_zone": self.tab_conn.cf_zone_var.get(),
-            "alert_email": self.tab_conn.alert_email_var.get()
+            "alert_email": self.tab_conn.alert_email_var.get(),
+            "shuffle_api_key": self.tab_conn.shuffle_api_key_var.get()
         })
         messagebox.showinfo("Success", f"Configuration saved to {config_path}")
 
@@ -403,7 +373,8 @@ print(json.dumps(stats))
             "key_path": key,
             "cf_token": self.tab_conn.cf_token_var.get(),
             "cf_zone": self.tab_conn.cf_zone_var.get(),
-            "alert_email": self.tab_conn.alert_email_var.get()
+            "alert_email": self.tab_conn.alert_email_var.get(),
+            "shuffle_api_key": self.tab_conn.shuffle_api_key_var.get()
         })
         
         # Reload config to ensure we have cf_domain

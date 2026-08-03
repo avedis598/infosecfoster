@@ -102,12 +102,38 @@ class TheHiveTab(BaseDashboardTab):
         tk.Label(self.creds_frame, text="Password: secret", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
 
 class ShuffleTab(BaseDashboardTab):
-    def __init__(self, parent):
+    def __init__(self, parent, install_callback=None):
         super().__init__(parent, "Shuffle SOAR", C["shuffle"])
         
         tk.Label(self.creds_frame, text="Username: admin", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
         tk.Label(self.creds_frame, text="Password: Admin1234!", bg=C["bg"], fg=C["text"], font=FONT_BOLD).pack(pady=2)
+        # Playbook Installer Section
+        self.pb_frame = tk.Frame(self.container, bg=C["card"], padx=20, pady=20, highlightbackground=C["border"], highlightthickness=1)
+        self.pb_frame.pack(pady=20, fill="x")
 
+        tk.Label(self.pb_frame, text="Deploy Playbook", font=("Helvetica", 14, "bold"), bg=C["card"], fg=C["text"]).pack(anchor="w", pady=(0, 10))
+        tk.Label(self.pb_frame, text="Select a Shuffle JSON template from the 'playbooks' folder:", bg=C["card"], fg=C["muted"]).pack(anchor="w")
+
+        self.playbooks = []
+        import os
+        if os.path.exists("playbooks"):
+            self.playbooks = [f for f in os.listdir("playbooks") if f.endswith(".json")]
+
+        from tkinter import ttk
+        self.pb_combo = ttk.Combobox(self.pb_frame, values=self.playbooks, state="readonly", width=50)
+        self.pb_combo.pack(anchor="w", pady=10)
+        if self.playbooks:
+            self.pb_combo.current(0)
+        else:
+            self.pb_combo.set("No templates found in 'playbooks/' folder")
+
+        if install_callback:
+            def on_install():
+                selected = self.pb_combo.get()
+                if selected and selected.endswith(".json"):
+                    install_callback(selected)
+            self.install_btn = FlatBtn(self.pb_frame, text="Deploy Selected Playbook", bg=C["success"], fg=C["bg"], command=on_install)
+            self.install_btn.pack(anchor="w", pady=(10, 0))
 from tkinter import ttk
 
 class GrafanaTab(tk.Frame):

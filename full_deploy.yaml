@@ -1,0 +1,287 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: aml-lab
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: OpenSearch
+      uid: OpenSearch
+      type: grafana-opensearch-datasource
+      url: http://opensearch.aml-lab.svc.cluster.local:9200
+      access: proxy
+      jsonData:
+        database: "[wazuh-alerts-4.x-]YYYY.MM.DD"
+        timeField: "timestamp"
+        version: "2.13.0"
+    - name: SIEM-Telemetry
+      uid: SIEM-Telemetry
+      type: grafana-opensearch-datasource
+      url: http://opensearch.aml-lab.svc.cluster.local:9200
+      access: proxy
+      jsonData:
+        database: "siem-telemetry"
+        timeField: "timestamp"
+        version: "2.13.0"
+    - name: TheHive
+      uid: TheHive
+      type: yesoreyeram-infinity-datasource
+      url: http://thehive.aml-lab.svc.cluster.local:9000/api/v1
+      access: proxy
+      secureJsonData:
+        httpHeaderValue1: "Bearer ${THEHIVE_API_KEY}"
+      jsonData:
+        httpHeaderName1: "Authorization"
+        global_queries: []
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: aml-lab
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-json
+  namespace: aml-lab
+data:
+  unified-dashboard.json: |
+    {"title": "Unified SIEM Dashboard", "uid": "unified", "schemaVersion": 38, "timezone": "browser", "refresh": "30s", "time": {"from": "now-24h", "to": "now"}, "panels": [{"type": "row", "title": "Executive View", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}}, {"type": "stat", "title": "Threats Blocked This Month", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "count"}], "query": "rule.level:>=10", "refId": "A", "timeField": "timestamp"}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "OpenSearch"}}, {"type": "stat", "title": "Average Response Time", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "avg", "field": "response_time_median"}], "query": "", "refId": "A", "timeField": "timestamp"}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Devices Protected", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_total"}], "query": "", "refId": "A", "timeField": "timestamp"}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Security Posture Score", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "avg", "field": "posture_score"}], "query": "", "refId": "A", "timeField": "timestamp"}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "row", "title": "Operational View - Wazuh Agents", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}}, {"type": "stat", "title": "Total Agents", "gridPos": {"h": 4, "w": 4, "x": 0, "y": 6}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_total"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Active", "gridPos": {"h": 4, "w": 4, "x": 4, "y": 6}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_active"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Disconnected", "gridPos": {"h": 4, "w": 4, "x": 8, "y": 6}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_disconnected"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Pending", "gridPos": {"h": 4, "w": 4, "x": 12, "y": 6}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_pending"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Never Connected", "gridPos": {"h": 4, "w": 4, "x": 16, "y": 6}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "wazuh_never"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "row", "title": "Operational View - OpenSearch Alerts", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 10}}, {"type": "stat", "title": "Total Alerts", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 11}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "alerts_total"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Level 12+", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 11}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "alerts_level12"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Auth Failure", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 11}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "alerts_authfail"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "stat", "title": "Auth Success", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 11}, "targets": [{"bucketAggs": [{"id": "2", "settings": {"interval": "auto"}, "type": "date_histogram"}], "metrics": [{"id": "1", "type": "max", "field": "alerts_authsucc"}], "refId": "A", "timeField": "timestamp", "query": ""}], "datasource": {"type": "grafana-opensearch-datasource", "uid": "SIEM-Telemetry"}}, {"type": "row", "title": "Incident Response - TheHive", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15}}, {"type": "stat", "title": "Open Cases", "gridPos": {"h": 6, "w": 4, "x": 0, "y": 16}, "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "TheHive"}, "targets": [{"type": "json", "url": "/query?range=all", "global_query_id": "", "refId": "A", "format": "table", "source": "url", "url_options": {"method": "POST", "data": "{\"query\": [{\"_name\": \"listCase\"}, {\"_name\": \"filter\", \"_field\": \"status\", \"_value\": \"Open\"}]}"}, "root_selector": "", "columns": []}], "transformations": [{"id": "reduce", "options": {"reducers": ["count"]}}]}, {"type": "piechart", "title": "Open Cases by Severity", "gridPos": {"h": 6, "w": 6, "x": 4, "y": 16}, "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "TheHive"}, "targets": [{"type": "json", "url": "/query?range=all", "refId": "A", "format": "table", "source": "url", "url_options": {"method": "POST", "data": "{\"query\": [{\"_name\": \"listCase\"}, {\"_name\": \"filter\", \"_field\": \"status\", \"_value\": \"Open\"}]}"}, "root_selector": "", "columns": [{"selector": "severity", "text": "severity", "type": "number"}]}], "transformations": [{"id": "groupingToMatrix", "options": {"columnField": "severity", "rowField": "severity", "valueField": "severity"}}]}, {"type": "table", "title": "Recent Cases", "gridPos": {"h": 6, "w": 14, "x": 10, "y": 16}, "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "TheHive"}, "targets": [{"type": "json", "url": "/query?range=all", "refId": "A", "format": "table", "source": "url", "url_options": {"method": "POST", "data": "{\"query\": [{\"_name\": \"listCase\"}, {\"_name\": \"sort\", \"_fields\": [{\"_createdAt\": \"desc\"}]}, {\"_name\": \"page\", \"from\": 0, \"to\": 20}]}"}, "root_selector": "", "columns": [{"selector": "caseId", "text": "ID", "type": "number"}, {"selector": "title", "text": "Title", "type": "string"}, {"selector": "severity", "text": "Severity", "type": "number"}, {"selector": "status", "text": "Status", "type": "string"}, {"selector": "assignee", "text": "Assignee", "type": "string"}, {"selector": "_createdAt", "text": "Created", "type": "timestamp"}]}]}]}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telemetry-aggregator-script
+  namespace: aml-lab
+data:
+  telemetry_aggregator.py: |
+    import urllib.request
+    import urllib.error
+    import json
+    import os
+    import ssl
+    import time
+    from datetime import datetime, timezone, timedelta
+    
+    def push_to_opensearch(doc):
+        url = "http://opensearch.aml-lab.svc.cluster.local:9200/siem-telemetry/_doc"
+        req = urllib.request.Request(url, data=json.dumps(doc).encode('utf-8'), headers={'Content-Type': 'application/json'}, method='POST')
+        try:
+            urllib.request.urlopen(req)
+        except Exception as e:
+            print(f"Error pushing to OpenSearch: {e}")
+    
+    def get_wazuh_stats():
+        stats = {"Total": 0, "Active": 0, "Disconnected": 0, "Pending": 0, "Never connected": 0}
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            # Get Token
+            req = urllib.request.Request("https://wazuh-master-svc.aml-lab.svc.cluster.local:55000/security/user/authenticate", headers={'Authorization': 'Basic d2F6dWg6d2F6dWg='})
+            with urllib.request.urlopen(req, context=ctx, timeout=5) as res:
+                token = json.loads(res.read())['data']['token']
+            # Get Agents
+            req2 = urllib.request.Request("https://wazuh-master-svc.aml-lab.svc.cluster.local:55000/agents?select=status", headers={'Authorization': f'Bearer {token}'})
+            with urllib.request.urlopen(req2, context=ctx, timeout=5) as res:
+                items = json.loads(res.read())['data']['affected_items']
+                stats["Total"] = len(items)
+                for item in items:
+                    status = item.get("status", "")
+                    if status == "active": stats["Active"] += 1
+                    elif status == "disconnected": stats["Disconnected"] += 1
+                    elif status == "pending": stats["Pending"] += 1
+                    elif status == "never_connected": stats["Never connected"] += 1
+        except Exception as e:
+            print(f"Wazuh Error: {e}")
+        return stats
+    
+    def get_os_count(query):
+        try:
+            url = "http://opensearch-proxy.aml-lab.svc.cluster.local:9200/wazuh-alerts-*/_count"
+            req = urllib.request.Request(url, data=json.dumps(query).encode('utf-8'), headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=5) as res:
+                return json.loads(res.read()).get("count", 0)
+        except Exception as e:
+            print(f"OS Error: {e}")
+            return 0
+    
+    def get_alerts_stats():
+        now = datetime.utcnow()
+        past = now - timedelta(days=1)
+        tf = {"range": {"@timestamp": {"gte": past.strftime("%Y-%m-%dT%H:%M:%SZ"), "lte": now.strftime("%Y-%m-%dT%H:%M:%SZ")}}}
+        stats = {"Total":0, "Level 12+":0, "Auth Failure":0, "Auth Success":0}
+        stats["Total"] = get_os_count({"query": {"bool": {"filter": [tf]}}})
+        stats["Level 12+"] = get_os_count({"query": {"bool": {"filter": [tf, {"range": {"rule.level": {"gte": 12}}}]}}})
+        stats["Auth Failure"] = get_os_count({"query": {"bool": {"filter": [tf, {"match": {"rule.groups": "authentication_failed"}}]}}})
+        stats["Auth Success"] = get_os_count({"query": {"bool": {"filter": [tf, {"match": {"rule.groups": "authentication_success"}}]}}})
+        return stats
+    
+    def main():
+        wz_stats = get_wazuh_stats()
+        al_stats = get_alerts_stats()
+        
+        doc = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "posture_score": 85,
+            "money_saved": 135000,
+            "open_critical_cases": 0,
+            "cases_awaiting_assignment": 0,
+            "response_time_median": 0,
+            "wazuh_total": wz_stats["Total"],
+            "wazuh_active": wz_stats["Active"],
+            "wazuh_disconnected": wz_stats["Disconnected"],
+            "wazuh_pending": wz_stats["Pending"],
+            "wazuh_never": wz_stats["Never connected"],
+            "alerts_total": al_stats["Total"],
+            "alerts_level12": al_stats["Level 12+"],
+            "alerts_authfail": al_stats["Auth Failure"],
+            "alerts_authsucc": al_stats["Auth Success"]
+        }
+        push_to_opensearch(doc)
+    
+    if __name__ == "__main__":
+        main()
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: siem-telemetry-cronjob
+  namespace: aml-lab
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: aggregator
+            image: python:3.9-slim
+            command: ["python", "/scripts/telemetry_aggregator.py"]
+            volumeMounts:
+            - name: script-vol
+              mountPath: /scripts
+          volumes:
+          - name: script-vol
+            configMap:
+              name: telemetry-aggregator-script
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: aml-lab
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: grafana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: aml-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.3.3
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_INSTALL_PLUGINS
+          value: grafana-opensearch-datasource,grafana-clickhouse-datasource,marcusolsson-json-datasource,yesoreyeram-infinity-datasource
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "true"
+        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+          value: Admin
+        - name: THEHIVE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: thehive-api-key
+              key: api-key
+        volumeMounts:
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+          subPath: datasources.yaml
+        - name: grafana-dashboards-provider
+          mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+          subPath: dashboards.yaml
+        - name: grafana-dashboards-json
+          mountPath: /var/lib/grafana/dashboards
+      volumes:
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-provider
+        configMap:
+          name: grafana-dashboards-provider
+      - name: grafana-dashboards-json
+        configMap:
+          name: grafana-dashboards-json
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: aml-lab
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - grafana.aml-lab.infosecfoster.com
+    - grafana.aml-lab.amlsiem.com
+    secretName: grafana-tls
+  rules:
+  - host: grafana.aml-lab.infosecfoster.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  - host: grafana.aml-lab.amlsiem.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+---

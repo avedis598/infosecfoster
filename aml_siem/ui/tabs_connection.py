@@ -15,6 +15,7 @@ class ConnectionTab(tk.Frame):
         self.user_var = tk.StringVar(value="ubuntu")
         self.key_var = tk.StringVar(value="~/.ssh/id_rsa")
         self.alert_email_var = tk.StringVar(value="admin@amlsiem.com")
+        self.shuffle_api_key_var = tk.StringVar()
         self.cf_token_var = tk.StringVar()
         self.cf_zone_var = tk.StringVar()
         
@@ -52,6 +53,7 @@ class ConnectionTab(tk.Frame):
             ("SSH Username:", self.user_var),
             ("Private Key Path:", self.key_var),
             ("Alert Email:", self.alert_email_var),
+            ("Shuffle API Key:", self.shuffle_api_key_var),
         ]
         
         for i, (label_text, var) in enumerate(fields):
