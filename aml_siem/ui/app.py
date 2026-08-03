@@ -123,6 +123,13 @@ print(f"--- DEBUG: Original Workflow ---")
 print(f"Name: {{workflow.get('name')}}")
 print(f"Actions count: {{len(workflow.get('actions', []))}}")
 
+print(f"--- DEBUG: Available Apps in Cluster ---")
+if apps:
+    for a in apps[:100]: # Print up to 100 apps to avoid flooding
+        print(f" - {{a.get('name')}} (ID: {{a.get('id')}})")
+else:
+    print("WARNING: No apps returned from /api/v1/apps API!")
+
 # Dynamically map App IDs for actions
 for action in workflow.get("actions", []):
     app_name = action.get("app_name")
@@ -172,7 +179,9 @@ except urllib.error.HTTPError as e:
             if ok and "SUCCESS" in out:
                 self.after(0, lambda: messagebox.showinfo("Success", f"{playbook_filename} successfully installed into Shuffle SOAR!"))
             else:
-                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook:\n{out}"))
+                with open("shuffle_debug.log", "w") as f:
+                    f.write(out)
+                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook.\nDetailed logs have been saved to shuffle_debug.log in the current directory."))
                 
         threading.Thread(target=worker, daemon=True).start()
 
