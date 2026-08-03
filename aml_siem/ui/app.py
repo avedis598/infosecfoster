@@ -66,7 +66,7 @@ class AMLSiemApp(tk.Tk):
         self.tab_overview = OverviewTab(self.notebook, refresh_callback=self._fetch_overview)
         self.tab_wazuh = WazuhTab(self.notebook, refresh_callback=self._fetch_wazuh_agents)
         self.tab_thehive = TheHiveTab(self.notebook)
-        self.tab_shuffle = ShuffleTab(self.notebook, install_callback=self._install_pb01)
+        self.tab_shuffle = ShuffleTab(self.notebook, install_callback=self._install_playbook)
         self.tab_grafana = GrafanaTab(self.notebook)
         self.tab_reports = ReportsTab(self.notebook, self.ssh)
         
