@@ -84,11 +84,12 @@ class AMLSiemApp(tk.Tk):
             messagebox.showerror("Error", "Please enter the Shuffle API Key in the Connection tab.")
             return
 
-        import os, json
+        import os, json, base64
         pb_path = os.path.join("playbooks", playbook_filename)
         try:
             with open(pb_path, "r") as f:
                 workflow_json = f.read()
+            workflow_b64 = base64.b64encode(workflow_json.encode()).decode()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read template: {e}")
             return
@@ -97,7 +98,7 @@ class AMLSiemApp(tk.Tk):
         import threading
         def worker():
             script = f"""
-import urllib.request, json, ssl, sys, uuid
+import urllib.request, json, ssl, sys, uuid, base64
 
 shuffle_url = "http://shuffle-backend.aml-lab.svc.cluster.local:5001"
 api_key = "{shuffle_api_key}"
@@ -114,7 +115,9 @@ except Exception as e:
     print(f"Failed to fetch apps: {{e}}")
     sys.exit(1)
 
-workflow = json.loads('''{workflow_json}''')
+workflow_b64 = "{workflow_b64}"
+workflow_json = base64.b64decode(workflow_b64).decode()
+workflow = json.loads(workflow_json)
 
 # Dynamically map App IDs
 for action in workflow.get("actions", []):
@@ -140,7 +143,7 @@ except urllib.error.HTTPError as e:
             if ok and "SUCCESS" in out:
                 self.after(0, lambda: messagebox.showinfo("Success", f"{playbook_filename} successfully installed into Shuffle SOAR!"))
             else:
-                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook:\\n{{out}}"))
+                self.after(0, lambda: messagebox.showerror("Installation Failed", f"Failed to install playbook:\n{out}"))
                 
         threading.Thread(target=worker, daemon=True).start()
 
