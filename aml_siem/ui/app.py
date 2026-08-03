@@ -145,7 +145,7 @@ for trigger in workflow.get("triggers", []):
             trigger["app_id"] = matched_app["id"]
             trigger["app_version"] = matched_app["app_version"]
 
-# Remove org_id which can cause {"success": false} if it belongs to another cluster
+# Remove org_id which can cause 'success: false' error if it belongs to another cluster
 if "org_id" in workflow:
     print(f"DEBUG: Removing hardcoded org_id '{{workflow['org_id']}}'")
     del workflow["org_id"]
