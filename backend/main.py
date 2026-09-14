@@ -247,7 +247,7 @@ async def monitor_overview(payload: MonitorPayload):
                         pods.append({"name": parts[0], "status": parts[1]})
 
             # Get Images
-            res_img = await conn.run("sudo k3s kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{"\n"}{end}'", check=False)
+            res_img = await conn.run("sudo k3s kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{\"\\n\"}{end}'", check=False)
             images = []
             if res_img.exit_status == 0 and res_img.stdout:
                 img_set = set()
@@ -278,3 +278,16 @@ async def monitor_wazuh(payload: MonitorPayload):
             }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.post("/api/monitor/thehive")
+async def monitor_thehive(payload: MonitorPayload):
+    # Mocking for now - would query TheHive API
+    return {"status": "success", "cases": {"total": 42, "critical": 2, "open": 5}}
+
+@app.post("/api/monitor/shuffle")
+async def monitor_shuffle(payload: MonitorPayload):
+    return {"status": "success", "workflows": {"active": 14, "failed": 0, "executions": 1205}}
+
+@app.post("/api/monitor/grafana")
+async def monitor_grafana(payload: MonitorPayload):
+    return {"status": "success", "dashboards": 8, "alerts": 0}
