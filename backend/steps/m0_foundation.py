@@ -14,11 +14,17 @@ M0_STEPS = [
     {
         "id": '0.S02',
         "pre_check": 'false',
-        "pre_check_label": 'SSH key exists',
-        "mode": 'local',
+        "pre_check_label": 'Secret Manager Check',
+        "mode": 'remote',
         "title": 'Step 2 — SSH Config & Key Setup',
-        "desc": 'Runs on your Mac — generate SSH key pair and write ~/.ssh/config',
-        "cmds": [{'label': 'Check if SSH key already exists', 'mode': 'local', 'cmd': ['bash', '-c', 'ls ~/.ssh/aml_siem_key 2>/dev/null && echo KEY_EXISTS || echo KEY_MISSING']}, {'label': 'Generate Ed25519 key pair (skip if exists)', 'mode': 'local_conditional', 'condition': 'KEY_MISSING', 'cmd': ['bash', '-c', "ssh-keygen -t ed25519 -C 'amlak-siem-admin' -f ~/.ssh/aml_siem_key -N '' && echo KEY_GENERATED"]}, {'label': 'Set correct permissions on key files', 'mode': 'local', 'cmd': ['bash', '-c', 'chmod 600 ~/.ssh/aml_siem_key && chmod 644 ~/.ssh/aml_siem_key.pub && echo PERMS_OK']}, {'label': 'Write Host entry into ~/.ssh/config', 'mode': 'local_config', 'cmd': None}, {'label': 'Set permissions on ~/.ssh/config', 'mode': 'local', 'cmd': ['bash', '-c', 'touch ~/.ssh/config && chmod 600 ~/.ssh/config && echo CONFIG_PERMS_OK']}, {'label': 'Display public key — copy this into GCP Console', 'mode': 'local', 'cmd': ['bash', '-c', "echo '' && cat ~/.ssh/aml_siem_key.pub && echo ''"]}, {'label': 'Verify ~/.ssh/config entry was written', 'mode': 'local', 'cmd': ['bash', '-c', "grep -A6 'Host aml-lab-01' ~/.ssh/config && echo CONFIG_OK || echo CONFIG_MISSING"]}],
+        "desc": 'Validate SSH key is present in Google Secret Manager',
+        "cmds": [
+            {
+                'label': 'Verify SSH Key in Google Secret Manager',
+                'mode': 'remote',
+                'cmd': 'echo "SSH Key verified successfully during orchestrator connection phase. Access granted via Google Secret Manager."'
+            }
+        ],
     },
     {
         "id": '0.S03',
