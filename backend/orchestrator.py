@@ -24,8 +24,8 @@ class CloudOrchestrator:
     async def _run_remote(self, cmd_str):
         if not cmd_str: return True, ""
         
-        cmd_str = cmd_str.replace("admin@amlsiem.com", self.alert_email)
-        cmd_str = cmd_str.replace("amlsiem.com", self.domain)
+        cmd_str = cmd_str.replace("admin@infosecfoster.com", self.alert_email)
+        cmd_str = cmd_str.replace("infosecfoster.com", self.domain)
         cmd_str = cmd_str.replace("aml-lab", self.client_id)
         
         try:
@@ -96,24 +96,24 @@ class CloudOrchestrator:
                             try:
                                 import json, subprocess, os
                                 from google.cloud import secretmanager
-                                secret_id = f"cf-token-{client_id.lower().replace(' ', '-')}"
+                                secret_id = f"cf-token-{self.client_id.lower().replace(' ', '-')}"
                                 parent = f"projects/{os.environ.get('PROJECT_ID', 'infosecfoster-5bb83')}"
                                 sm_client = secretmanager.SecretManagerServiceClient()
                                 resp = sm_client.access_secret_version(request={"name": f"{parent}/secrets/{secret_id}/versions/latest"})
                                 cf_token = resp.payload.data.decode('utf-8').strip()
                                 
-                                zone_cmd = f"curl -s -X GET 'https://api.cloudflare.com/client/v4/zones?name=amlsiem.com' -H 'Authorization: Bearer {cf_token}' -H 'Content-Type: application/json'"
+                                zone_cmd = f"curl -s -X GET 'https://api.cloudflare.com/client/v4/zones?name=infosecfoster.com' -H 'Authorization: Bearer {cf_token}' -H 'Content-Type: application/json'"
                                 zone_res = subprocess.check_output(zone_cmd, shell=True).decode('utf-8')
                                 zone_data = json.loads(zone_res)
                                 if not zone_data.get('success') or not zone_data.get('result'):
-                                    ok, output = False, f"[FAIL] Failed to fetch Cloudflare Zone ID for amlsiem.com. API Response: {zone_data}"
+                                    ok, output = False, f"[FAIL] Failed to fetch Cloudflare Zone ID for infosecfoster.com. API Response: {zone_data}"
                                 else:
                                     zone_id = zone_data['result'][0]['id']
                                     dns_cmd = f"curl -s -X POST 'https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records' -H 'Authorization: Bearer {cf_token}' -H 'Content-Type: application/json' --data '{{\"type\":\"A\",\"name\":\"{record_name}\",\"content\":\"{self.ip}\",\"ttl\":1,\"proxied\":false}}'"
                                     dns_res = subprocess.check_output(dns_cmd, shell=True).decode('utf-8')
                                     dns_data = json.loads(dns_res)
                                     if dns_data.get('success') or (dns_data.get('errors') and 'already exists' in str(dns_data.get('errors'))):
-                                        ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.amlsiem.com' -> {self.ip} active in Cloudflare"
+                                        ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.ip} active in Cloudflare"
                                     else:
                                         ok, output = False, f"[FAIL] Cloudflare API Error: {dns_data.get('errors')}"
                             except Exception as e:
