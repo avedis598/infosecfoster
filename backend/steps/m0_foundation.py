@@ -458,15 +458,7 @@ M0_STEPS = [
         "desc": 'Add .gitkeep to empty directories so git tracks the folder structure',
         "cmds": [{'label': 'Add .gitkeep to empty folders', 'cmd': "find /opt/aml-siem -type d -not -path '*/.git*' -not -path '*/logs*' -not -path '*/backups*' -empty -exec touch {}/.gitkeep \\; && echo 'GITKEEP_CREATED'"}, {'label': 'Verify gitkeep files created', 'cmd': "find /opt/aml-siem -name '.gitkeep'"}],
     },
-    {
-        "id": '0.G07',
-        "pre_check": 'ls /opt/aml-siem/docs/sprints/*.md 2>/dev/null | wc -l | grep -q -v "^0$"',
-        "pre_check_label": 'Sprint docs already uploaded',
-        "mode": 'local',
-        "title": 'G07 — Upload Sprint Documentation',
-        "desc": 'Upload markdown documents from local workspace to VM docs directory',
-        "cmds": [{'label': 'Upload local markdown docs to VM', 'mode': 'local_upload_docs', 'cmd': None}, {'label': 'List uploaded markdown files on VM', 'mode': 'remote', 'cmd': 'ls -la /opt/aml-siem/docs/sprints/'}],
-    },
+
     {
         "id": '0.G08',
         "pre_check": 'false',
@@ -501,6 +493,6 @@ M0_STEPS = [
         "mode": 'remote',
         "title": 'Gate Verification — M0.5 Git & Folders',
         "desc": 'Validate that all M0.5 folders exist, git is configured, gitignore is active, and first commit is done',
-        "cmds": [{'label': 'Gate: Folder structure exists', 'cmd': 'tree -L 2 /opt/aml-siem'}, {'label': 'Gate: Git repository initialized and log exists', 'cmd': "cd /opt/aml-siem && git log --oneline && echo 'GATE_PASS: Git repo log OK'"}, {'label': 'Gate: Gitignore is actively ignoring keys', 'cmd': "touch /opt/aml-siem/test-secret.key && (cd /opt/aml-siem && git check-ignore -v test-secret.key && echo 'GATE_PASS: .gitignore works' || echo 'GATE_FAIL: .gitignore failed') && rm -f /opt/aml-siem/test-secret.key"}, {'label': 'Gate: No raw secrets committed', 'cmd': "cd /opt/aml-siem && git log -p --all | grep -iE '(BEGIN.*PRIVATE|password.*=.*[a-z0-9]|api[_-]?key.*=.*[a-z0-9])' | head -5 || echo 'GATE_PASS: No secrets in commit'"}, {'label': 'Gate: Sprint documents present', 'cmd': "ls /opt/aml-siem/docs/sprints/*.md 2>/dev/null | wc -l | xargs -I{} echo 'GATE_PASS: Sprint docs found: {}'"}],
+        "cmds": [{'label': 'Gate: Folder structure exists', 'cmd': 'tree -L 2 /opt/aml-siem'}, {'label': 'Gate: Git repository initialized and log exists', 'cmd': "cd /opt/aml-siem && git log --oneline && echo 'GATE_PASS: Git repo log OK'"}, {'label': 'Gate: Gitignore is actively ignoring keys', 'cmd': "touch /opt/aml-siem/test-secret.key && (cd /opt/aml-siem && git check-ignore -v test-secret.key && echo 'GATE_PASS: .gitignore works' || echo 'GATE_FAIL: .gitignore failed') && rm -f /opt/aml-siem/test-secret.key"}, {'label': 'Gate: No raw secrets committed', 'cmd': "cd /opt/aml-siem && git log -p --all | grep -iE '(BEGIN.*PRIVATE|password.*=.*[a-z0-9]|api[_-]?key.*=.*[a-z0-9])' | head -5 || echo 'GATE_PASS: No secrets in commit'"}],
     },
 ]
