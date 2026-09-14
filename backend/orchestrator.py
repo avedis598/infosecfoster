@@ -114,7 +114,7 @@ class CloudOrchestrator:
                                     ok, output = False, f"[FAIL] Failed to fetch Cloudflare Zone ID for infosecfoster.com. API Response: {zone_data}"
                                 else:
                                     zone_id = zone_data['result'][0]['id']
-                                    payload = json.dumps({"type":"A","name":record_name,"content":self.ip,"ttl":1,"proxied":False}).encode('utf-8')
+                                    payload = json.dumps({"type":"A","name":record_name,"content":self.conn.get_extra_info('peername')[0],"ttl":1,"proxied":False}).encode('utf-8')
                                     req2 = urllib.request.Request(
                                         f'https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records',
                                         data=payload,
@@ -124,13 +124,13 @@ class CloudOrchestrator:
                                         with urllib.request.urlopen(req2) as response2:
                                             dns_data = json.loads(response2.read().decode('utf-8'))
                                             if dns_data.get('success'):
-                                                ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.ip} active in Cloudflare"
+                                                ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare"
                                             else:
                                                 ok, output = False, f"[FAIL] Cloudflare API Error: {dns_data.get('errors')}"
                                     except urllib.error.HTTPError as e:
                                         err_res = json.loads(e.read().decode('utf-8'))
                                         if err_res.get('errors') and 'already exists' in str(err_res.get('errors')):
-                                            ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.ip} active in Cloudflare (Already Existed)"
+                                            ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare (Already Existed)"
                                         else:
                                             ok, output = False, f"[FAIL] HTTP {e.code}: {err_res}"
                             except Exception as e:
