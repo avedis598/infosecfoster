@@ -291,3 +291,54 @@ async def monitor_shuffle(payload: MonitorPayload):
 @app.post("/api/monitor/grafana")
 async def monitor_grafana(payload: MonitorPayload):
     return {"status": "success", "dashboards": 8, "alerts": 0}
+
+
+class KeyPayload(BaseModel):
+    private_key: str
+
+@app.post("/api/clients/{client_id}/key")
+async def upload_ssh_key(client_id: str, payload: KeyPayload):
+    try:
+        secret_id = f"ssh-key-{client_id.lower().replace(' ', '-')}"
+        parent = f"projects/{PROJECT_ID}"
+        client = secretmanager.SecretManagerServiceClient()
+        
+        # Check if secret exists
+        try:
+            client.get_secret(request={"name": f"{parent}/secrets/{secret_id}"})
+            exists = True
+        except Exception:
+            exists = False
+            
+        if not exists:
+            # Create the secret
+            client.create_secret(
+                request={
+                    "parent": parent,
+                    "secret_id": secret_id,
+                    "secret": {"replication": {"automatic": {}}},
+                }
+            )
+            
+        # Add the new version
+        client.add_secret_version(
+            request={
+                "parent": f"{parent}/secrets/{secret_id}",
+                "payload": {"data": payload.private_key.encode("UTF-8")},
+            }
+        )
+        return {"status": "success", "message": "SSH key securely stored in Secret Manager."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+        
+@app.get("/api/clients/{client_id}/key/status")
+async def check_ssh_key(client_id: str):
+    try:
+        secret_id = f"ssh-key-{client_id.lower().replace(' ', '-')}"
+        name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
+        client = secretmanager.SecretManagerServiceClient()
+        # Just try to access it
+        client.access_secret_version(request={"name": name})
+        return {"status": "success", "exists": True}
+    except Exception as e:
+        return {"status": "success", "exists": False}
