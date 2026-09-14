@@ -85,44 +85,54 @@ export default function Dashboard({ user }) {
   const [sshKeyStatus, setSshKeyStatus] = useState('checking') // checking, missing, exists
   const [sshKeyInput, setSshKeyInput] = useState('')
   const [isUploadingKey, setIsUploadingKey] = useState(false)
+  
+  const [cfKeyStatus, setCfKeyStatus] = useState('checking')
+  const [cfKeyInput, setCfKeyInput] = useState('')
+  const [isUploadingCf, setIsUploadingCf] = useState(false)
 
   useEffect(() => {
     if (activeTab === 'Connection' && editClient) {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
-      fetch(`${backendUrl}/api/clients/${editClient.client_id || editClient.name}/key/status`)
+      const clientId = editClient.client_id || editClient.name
+      
+      fetch(`${backendUrl}/api/clients/${clientId}/secret/ssh/status`)
         .then(res => res.json())
-        .then(data => {
-          if(data.status === 'success' && data.exists) {
-            setSshKeyStatus('exists')
-          } else {
-            setSshKeyStatus('missing')
-          }
-        })
+        .then(data => setSshKeyStatus((data.status === 'success' && data.exists) ? 'exists' : 'missing'))
         .catch(() => setSshKeyStatus('missing'))
+        
+      fetch(`${backendUrl}/api/clients/${clientId}/secret/cf/status`)
+        .then(res => res.json())
+        .then(data => setCfKeyStatus((data.status === 'success' && data.exists) ? 'exists' : 'missing'))
+        .catch(() => setCfKeyStatus('missing'))
     }
   }, [activeTab, editClient])
 
-  const handleUploadKey = async () => {
-    if(!sshKeyInput) return
-    setIsUploadingKey(true)
+  const handleUploadKey = async (type) => {
+    const input = type === 'ssh' ? sshKeyInput : cfKeyInput
+    if(!input) return
+    const setUploading = type === 'ssh' ? setIsUploadingKey : setIsUploadingCf
+    const setStatus = type === 'ssh' ? setSshKeyStatus : setCfKeyStatus
+    const setInput = type === 'ssh' ? setSshKeyInput : setCfKeyInput
+    
+    setUploading(true)
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
     try {
-      const res = await fetch(`${backendUrl}/api/clients/${editClient.client_id || editClient.name}/key`, {
+      const res = await fetch(`${backendUrl}/api/clients/${editClient.client_id || editClient.name}/secret/${type}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ private_key: sshKeyInput })
+        body: JSON.stringify({ private_key: input })
       })
       const data = await res.json()
       if(data.status === 'success') {
-        setSshKeyStatus('exists')
-        setSshKeyInput('')
-        alert('SSH key securely uploaded to Google Secret Manager!')
+        setStatus('exists')
+        setInput('')
+        alert(`${type.toUpperCase()} securely uploaded to Google Secret Manager!`)
       } else {
         alert('Upload failed: ' + data.message)
       }
     } catch (e) {
       alert('Upload failed.')
     }
-    setIsUploadingKey(false)
+    setUploading(false)
   }
 
   const [overviewData, setOverviewData] = useState(null)
@@ -388,7 +398,7 @@ export default function Dashboard({ user }) {
 
                 {sshKeyStatus === 'missing' && (
                   <div className="flex items-start mt-4">
-                    <label className="w-1/3 text-xs font-bold text-red-400 text-right pr-4 pt-2">Missing SSH Key:</label>
+                    <label className="w-1/3 text-xs font-bold text-red-400 text-right pr-4 pt-2">Missing SSH Private Key:</label>
                     <div className="w-2/3 flex flex-col gap-2">
                       <textarea 
                         className="w-full px-4 py-2 bg-obsidian border border-red-500/30 rounded-[8px] text-white focus:ring-1 focus:ring-red-500 outline-none font-mono text-[10px] h-24"
@@ -396,12 +406,39 @@ export default function Dashboard({ user }) {
                         value={sshKeyInput}
                         onChange={(e) => setSshKeyInput(e.target.value)}
                       />
-                      <button type="button" onClick={handleUploadKey} disabled={isUploadingKey || !sshKeyInput} className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-4 py-1.5 rounded-[6px] text-xs font-bold self-end transition-all">
+                      <button type="button" onClick={() => handleUploadKey('ssh')} disabled={isUploadingKey || !sshKeyInput} className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-4 py-1.5 rounded-[6px] text-xs font-bold self-end transition-all">
                         {isUploadingKey ? 'Uploading...' : 'Securely Upload Key to Vault'}
                       </button>
                     </div>
                   </div>
                 )}
+
+                {cfKeyStatus === 'exists' && (
+                  <div className="flex items-center mt-4">
+                    <label className="w-1/3"></label>
+                    <div className="w-2/3 flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-[8px] text-blue-400 text-xs font-bold">
+                      <CheckCircle2 className="w-4 h-4" /> Cloudflare API Token Stored (Secret Manager)
+                    </div>
+                  </div>
+                )}
+
+                {cfKeyStatus === 'missing' && (
+                  <div className="flex items-start mt-4">
+                    <label className="w-1/3 text-xs font-bold text-red-400 text-right pr-4 pt-2">Missing Cloudflare Token:</label>
+                    <div className="w-2/3 flex flex-col gap-2">
+                      <input type="text"
+                        className="w-full px-4 py-2 bg-obsidian border border-red-500/30 rounded-[8px] text-white focus:ring-1 focus:ring-red-500 outline-none font-mono text-xs"
+                        placeholder="Bearer token string..."
+                        value={cfKeyInput}
+                        onChange={(e) => setCfKeyInput(e.target.value)}
+                      />
+                      <button type="button" onClick={() => handleUploadKey('cf')} disabled={isUploadingCf || !cfKeyInput} className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-4 py-1.5 rounded-[6px] text-xs font-bold self-end transition-all">
+                        {isUploadingCf ? 'Uploading...' : 'Securely Upload Token to Vault'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center">
                   <label className="w-1/3 text-xs font-bold text-gray-400 text-right pr-4">Alert Email:</label>
                   <input 
