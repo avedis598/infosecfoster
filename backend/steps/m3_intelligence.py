@@ -520,7 +520,7 @@ spec:
   tls:
   - hosts:
     - grafana.aml-lab.infosecfoster.com
-    - grafana.aml-lab.amlsiem.com
+    - grafana.aml-lab.infosecfoster.com
     secretName: grafana-tls
   rules:
   - host: grafana.aml-lab.infosecfoster.com
@@ -533,7 +533,7 @@ spec:
             name: grafana
             port:
               number: 3000
-  - host: grafana.aml-lab.amlsiem.com
+  - host: grafana.aml-lab.infosecfoster.com
     http:
       paths:
       - path: /
