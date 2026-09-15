@@ -100,127 +100,138 @@ class CloudOrchestrator:
 
         await self.log(f"Starting cloud deployment sequence. Found {len(target_steps)} steps to execute. Force: {is_force}", "head")
 
-        for step in target_steps:
-            title = step["title"]
-            step_mode = step.get("mode", "remote")
+        current_running_step = None
+        try:
+            for step in target_steps:
+                current_running_step = step['id']
+                title = step["title"]
+                step_mode = step.get("mode", "remote")
             
-            # Pre-check logic
-            pre = step.get("pre_check", "")
-            if pre and pre != "false" and not is_force:
-                ok, out = await self._run_remote(pre)
-                if ok:
-                    await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
-                    await self.log(f"  ✓ Already done — {title}", "ok")
-                    self._update_db_status({step["id"]: "success"})
-                    continue
+                # Pre-check logic
+                pre = step.get("pre_check", "")
+                if pre and pre != "false" and not is_force:
+                    ok, out = await self._run_remote(pre)
+                    if ok:
+                        await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
+                        await self.log(f"  ✓ Already done — {title}", "ok")
+                        self._update_db_status({step["id"]: "success"})
+                        continue
 
-            await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
+                await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
             
-            updates = {step["id"]: "running"}
-            current_global_idx = next((i for i, s in enumerate(all_steps) if s["id"] == step["id"]), -1)
-            if current_global_idx != -1:
-                for subsequent_step in all_steps[current_global_idx + 1:]:
-                    updates[subsequent_step["id"]] = "need_rerun"
+                updates = {step["id"]: "running"}
+                current_global_idx = next((i for i, s in enumerate(all_steps) if s["id"] == step["id"]), -1)
+                if current_global_idx != -1:
+                    for subsequent_step in all_steps[current_global_idx + 1:]:
+                        updates[subsequent_step["id"]] = "need_rerun"
                     
-            self._update_db_status(updates)
-            step_ok = True
-            for i, cmd_dict in enumerate(step.get("cmds", [])):
-                label = cmd_dict.get("label", f"Step {i+1}")
-                await self.log(f"  → {label}", "cmd")
+                self._update_db_status(updates)
+                step_ok = True
+                for i, cmd_dict in enumerate(step.get("cmds", [])):
+                    label = cmd_dict.get("label", f"Step {i+1}")
+                    await self.log(f"  → {label}", "cmd")
                 
-                sub_mode = cmd_dict.get("mode", step_mode)
+                    sub_mode = cmd_dict.get("mode", step_mode)
                 
-                try:
-                    if sub_mode == "local" or sub_mode.startswith("local_"):
-                        # Cloud optimizations for local tasks
-                        if sub_mode == "local_dns":
-                            record_name = cmd_dict.get("record_name", "test")
-                            try:
-                                import json, os
-                                import urllib.request
-                                from google.cloud import secretmanager
-                                secret_id = f"cf-token-{self.client_id.lower().replace(' ', '-')}"
-                                parent = f"projects/{os.environ.get('PROJECT_ID', 'infosecfoster-5bb83')}"
-                                sm_client = secretmanager.SecretManagerServiceClient()
-                                resp = sm_client.access_secret_version(request={"name": f"{parent}/secrets/{secret_id}/versions/latest"})
-                                cf_token = resp.payload.data.decode('utf-8').strip()
+                    try:
+                        if sub_mode == "local" or sub_mode.startswith("local_"):
+                            # Cloud optimizations for local tasks
+                            if sub_mode == "local_dns":
+                                record_name = cmd_dict.get("record_name", "test")
+                                try:
+                                    import json, os
+                                    import urllib.request
+                                    from google.cloud import secretmanager
+                                    secret_id = f"cf-token-{self.client_id.lower().replace(' ', '-')}"
+                                    parent = f"projects/{os.environ.get('PROJECT_ID', 'infosecfoster-5bb83')}"
+                                    sm_client = secretmanager.SecretManagerServiceClient()
+                                    resp = sm_client.access_secret_version(request={"name": f"{parent}/secrets/{secret_id}/versions/latest"})
+                                    cf_token = resp.payload.data.decode('utf-8').strip()
                                 
-                                req = urllib.request.Request(
-                                    'https://api.cloudflare.com/client/v4/zones?name=infosecfoster.com',
-                                    headers={'Authorization': f'Bearer {cf_token}', 'Content-Type': 'application/json'}
-                                )
-                                with urllib.request.urlopen(req) as response:
-                                    zone_data = json.loads(response.read().decode('utf-8'))
-                                    
-                                if not zone_data.get('success') or not zone_data.get('result'):
-                                    ok, output = False, f"[FAIL] Failed to fetch Cloudflare Zone ID for infosecfoster.com. API Response: {zone_data}"
-                                else:
-                                    zone_id = zone_data['result'][0]['id']
-                                    payload = json.dumps({"type":"A","name":record_name,"content":self.conn.get_extra_info('peername')[0],"ttl":1,"proxied":False}).encode('utf-8')
-                                    req2 = urllib.request.Request(
-                                        f'https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records',
-                                        data=payload,
+                                    req = urllib.request.Request(
+                                        'https://api.cloudflare.com/client/v4/zones?name=infosecfoster.com',
                                         headers={'Authorization': f'Bearer {cf_token}', 'Content-Type': 'application/json'}
                                     )
-                                    try:
-                                        with urllib.request.urlopen(req2) as response2:
-                                            dns_data = json.loads(response2.read().decode('utf-8'))
-                                            if dns_data.get('success'):
-                                                ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare"
+                                    with urllib.request.urlopen(req) as response:
+                                        zone_data = json.loads(response.read().decode('utf-8'))
+                                    
+                                    if not zone_data.get('success') or not zone_data.get('result'):
+                                        ok, output = False, f"[FAIL] Failed to fetch Cloudflare Zone ID for infosecfoster.com. API Response: {zone_data}"
+                                    else:
+                                        zone_id = zone_data['result'][0]['id']
+                                        payload = json.dumps({"type":"A","name":record_name,"content":self.conn.get_extra_info('peername')[0],"ttl":1,"proxied":False}).encode('utf-8')
+                                        req2 = urllib.request.Request(
+                                            f'https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records',
+                                            data=payload,
+                                            headers={'Authorization': f'Bearer {cf_token}', 'Content-Type': 'application/json'}
+                                        )
+                                        try:
+                                            with urllib.request.urlopen(req2) as response2:
+                                                dns_data = json.loads(response2.read().decode('utf-8'))
+                                                if dns_data.get('success'):
+                                                    ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare"
+                                                else:
+                                                    ok, output = False, f"[FAIL] Cloudflare API Error: {dns_data.get('errors')}"
+                                        except urllib.error.HTTPError as e:
+                                            err_res = json.loads(e.read().decode('utf-8'))
+                                            if err_res.get('errors') and 'already exists' in str(err_res.get('errors')):
+                                                ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare (Already Existed)"
                                             else:
-                                                ok, output = False, f"[FAIL] Cloudflare API Error: {dns_data.get('errors')}"
-                                    except urllib.error.HTTPError as e:
-                                        err_res = json.loads(e.read().decode('utf-8'))
-                                        if err_res.get('errors') and 'already exists' in str(err_res.get('errors')):
-                                            ok, output = True, f"[SUCCESS] DNS A Record '{record_name}.infosecfoster.com' -> {self.conn.get_extra_info('peername')[0]} active in Cloudflare (Already Existed)"
-                                        else:
-                                            ok, output = False, f"[FAIL] HTTP {e.code}: {err_res}"
-                            except Exception as e:
-                                ok, output = False, f"[FAIL] Cloudflare API error. Did you upload the CF token to Secret Manager? Error: {e}"
-                        elif sub_mode == "local_enroll_mac":
-                            ok, output = True, "[SKIPPED] Mac enrollment omitted in cloud orchestrator"
-                        elif sub_mode == "local_config":
-                            ok, output = True, "[SKIPPED] local ssh config not needed in cloud"
-                        else:
-                            ok, output = True, "[SKIPPED] local task ignored in cloud orchestrator"
+                                                ok, output = False, f"[FAIL] HTTP {e.code}: {err_res}"
+                                except Exception as e:
+                                    ok, output = False, f"[FAIL] Cloudflare API error. Did you upload the CF token to Secret Manager? Error: {e}"
+                            elif sub_mode == "local_enroll_mac":
+                                ok, output = True, "[SKIPPED] Mac enrollment omitted in cloud orchestrator"
+                            elif sub_mode == "local_config":
+                                ok, output = True, "[SKIPPED] local ssh config not needed in cloud"
+                            else:
+                                ok, output = True, "[SKIPPED] local task ignored in cloud orchestrator"
                             
-                    elif sub_mode == "remote_upload":
-                        # In the new system we just execute script inline
-                        script = cmd_dict.get("script", "")
-                        if script:
-                            # Write to temp file and bash it
-                            remote_cmd = f"cat << 'INNER_EOF' > /tmp/run.sh\n{script}\nINNER_EOF\nbash /tmp/run.sh && rm -f /tmp/run.sh"
-                            ok, output = await self._run_remote(remote_cmd)
+                        elif sub_mode == "remote_upload":
+                            # In the new system we just execute script inline
+                            script = cmd_dict.get("script", "")
+                            if script:
+                                # Write to temp file and bash it
+                                remote_cmd = f"cat << 'INNER_EOF' > /tmp/run.sh\n{script}\nINNER_EOF\nbash /tmp/run.sh && rm -f /tmp/run.sh"
+                                ok, output = await self._run_remote(remote_cmd)
+                            else:
+                                ok, output = True, ""
                         else:
-                            ok, output = True, ""
-                    else:
-                        cmd_str = cmd_dict.get("cmd", "")
-                        if isinstance(cmd_str, list):
-                            # Sometime local cmds are lists like ['bash', '-c', '...']
-                            cmd_str = " ".join(cmd_str)
-                        ok, output = await self._run_remote(cmd_str)
+                            cmd_str = cmd_dict.get("cmd", "")
+                            if isinstance(cmd_str, list):
+                                # Sometime local cmds are lists like ['bash', '-c', '...']
+                                cmd_str = " ".join(cmd_str)
+                            ok, output = await self._run_remote(cmd_str)
 
-                    if output:
-                        # stream output safely
-                        out_lines = output.replace('\n', '\r\n')
-                        await self.ws.send_text(f"\x1b[37m{out_lines}\x1b[0m\r\n")
+                        if output:
+                            # stream output safely
+                            out_lines = output.replace('\n', '\r\n')
+                            await self.ws.send_text(f"\x1b[37m{out_lines}\x1b[0m\r\n")
 
-                    if not ok:
-                        await self.log(f"  ✘ Failed: {label}", "fail")
+                        if not ok:
+                            await self.log(f"  ✘ Failed: {label}", "fail")
+                            step_ok = False
+                            break
+                        
+                    except Exception as e:
+                        await self.log(f"  ✘ Error: {e}", "fail")
                         step_ok = False
                         break
-                        
-                except Exception as e:
-                    await self.log(f"  ✘ Error: {e}", "fail")
-                    step_ok = False
-                    break
                     
-            if step_ok:
-                self._update_db_status({step["id"]: "success"})
-            else:
-                self._update_db_status({step["id"]: "failed"})
-                await self.log("DEPLOYMENT HALTED DUE TO ERRORS.", "fail")
-                return False
+                if step_ok:
+                    self._update_db_status({step["id"]: "success"})
+                else:
+                    self._update_db_status({step["id"]: "failed"})
+                    await self.log("DEPLOYMENT HALTED DUE TO ERRORS.", "fail")
+                    return False
+
+        except Exception as e:
+            if current_running_step:
+                try:
+                    self._update_db_status({current_running_step: "failed"})
+                except:
+                    pass
+            raise e
 
         await self.log("\n[SUCCESS] All selected steps deployed successfully!", "ok")
         return True
