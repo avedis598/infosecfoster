@@ -3,6 +3,19 @@ import React, { useState, useEffect } from 'react'
 export default function ModuleTree({ modulesHierarchy, selectedSteps, setSelectedSteps, stepStatus = {} }) {
   const [expanded, setExpanded] = useState({})
 
+  const getStatus = (stepId) => {
+    if (!stepStatus) return undefined;
+    if (stepStatus[stepId]) return stepStatus[stepId];
+    const parts = stepId.split('.');
+    let curr = stepStatus;
+    for (let p of parts) {
+      if (curr && curr[p]) curr = curr[p];
+      else return undefined;
+    }
+    return curr;
+  }
+
+
   // Toggle expanding a module or step
   const toggleExpand = (id) => {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
@@ -72,7 +85,7 @@ export default function ModuleTree({ modulesHierarchy, selectedSteps, setSelecte
                     {mod.name}
                   </span>
                   {(() => {
-                    const statuses = mod.steps.map(s => stepStatus[s.id]);
+                    const statuses = mod.steps.map(s => getStatus(s.id));
                     if (statuses.includes('running')) {
                       return <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">RUNNING</span>;
                     }
@@ -115,10 +128,10 @@ export default function ModuleTree({ modulesHierarchy, selectedSteps, setSelecte
                             <span className={`transition-colors leading-tight ${isStepSelected ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
                               {step.title}
                             </span>
-                            {stepStatus[step.id] === 'success' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">SUCCESS</span>}
-                            {stepStatus[step.id] === 'failed' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">FAILED</span>}
-                            {stepStatus[step.id] === 'running' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">RUNNING</span>}
-                            {stepStatus[step.id] === 'need_rerun' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">NEED RERUN</span>}
+                            {getStatus(step.id) === 'success' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">SUCCESS</span>}
+                            {getStatus(step.id) === 'failed' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">FAILED</span>}
+                            {getStatus(step.id) === 'running' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">RUNNING</span>}
+                            {getStatus(step.id) === 'need_rerun' && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">NEED RERUN</span>}
                           </div>
                         </div>
                         
