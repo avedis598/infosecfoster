@@ -67,9 +67,28 @@ export default function ModuleTree({ modulesHierarchy, selectedSteps, setSelecte
                   ref={el => { if(el) el.indeterminate = isIndeterminate }}
                   onChange={(e) => handleModuleCheck(mod, e.target.checked)}
                 />
-                <span onClick={() => toggleExpand(mod.id)} className={`font-bold transition-colors ${isAllSelected || isIndeterminate ? 'text-emerald-500' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                  {mod.name}
-                </span>
+                <div className="flex flex-1 items-center justify-between" onClick={() => toggleExpand(mod.id)}>
+                  <span className={`font-bold transition-colors ${isAllSelected || isIndeterminate ? 'text-emerald-500' : 'text-gray-400 group-hover:text-gray-300'}`}>
+                    {mod.name}
+                  </span>
+                  {(() => {
+                    const statuses = mod.steps.map(s => stepStatus[s.id]);
+                    if (statuses.includes('running')) {
+                      return <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">RUNNING</span>;
+                    }
+                    if (statuses.includes('failed')) {
+                      return <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">FAILED</span>;
+                    }
+                    if (statuses.includes('need_rerun')) {
+                      return <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">NEED RERUN</span>;
+                    }
+                    // Only show success if ALL steps in the module are success
+                    if (statuses.length > 0 && statuses.every(s => s === 'success')) {
+                      return <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">SUCCESS</span>;
+                    }
+                    return null;
+                  })()}
+                </div>
               </div>
 
               {isExpanded && (
