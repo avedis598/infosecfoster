@@ -154,7 +154,11 @@ export default function Dashboard({ user }) {
         body: JSON.stringify({ client_id: editClient.client_id || editClient.name, ip: editClient.ip_address, username: editClient.ssh_username })
       })
       const data = await res.json()
-      if (data.status === 'success') setOverviewData(data)
+      if (data.status === 'success') {
+          setOverviewData(data)
+      } else {
+          setOverviewData({ error: data.message || "Unknown error" })
+      }
     } catch (e) {
       console.error(e)
     }
@@ -587,6 +591,11 @@ export default function Dashboard({ user }) {
             
             <div className="bg-matte border border-white/5 rounded-2xl p-6 shadow-xl">
               <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Pod Status</h3>
+              {overviewData && overviewData.error && (
+                <div className="bg-red-500/20 text-red-400 border border-red-500/30 p-3 mb-4 rounded-lg text-xs font-mono">
+                  Error Fetching Data: {overviewData.error}
+                </div>
+              )}
               {overviewData && overviewData.pods && overviewData.pods.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {overviewData.pods.map((p, i) => (

@@ -238,7 +238,7 @@ async def monitor_overview(payload: MonitorPayload):
     try:
         async with await get_ssh_conn(payload.client_id, payload.ip, payload.username) as conn:
             # Get Pods
-            res_pods = await conn.run("sudo k3s kubectl get pods -A --no-headers | awk '{print $1"/"$2","$4}'", check=False)
+            res_pods = await conn.run("KUBECONFIG=$HOME/.kube/config kubectl get pods -A --no-headers | awk '{print $1"/"$2","$4}'", check=False)
             pods = []
             if res_pods.exit_status == 0 and res_pods.stdout:
                 for line in res_pods.stdout.strip().split('\n'):
@@ -247,7 +247,7 @@ async def monitor_overview(payload: MonitorPayload):
                         pods.append({"name": parts[0], "status": parts[1]})
 
             # Get Images
-            res_img = await conn.run("KUBECONFIG=~/.kube/config kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{\"\\n\"}{end}'", check=False)
+            res_img = await conn.run("KUBECONFIG=$HOME/.kube/config kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{\"\\n\"}{end}'", check=False)
             images = []
             if res_img.exit_status == 0 and res_img.stdout:
                 img_set = set()
