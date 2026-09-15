@@ -247,7 +247,7 @@ async def monitor_overview(payload: MonitorPayload):
                         pods.append({"name": parts[0], "status": parts[1]})
 
             # Get Images
-            res_img = await conn.run("sudo k3s kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{\"\\n\"}{end}'", check=False)
+            res_img = await conn.run("KUBECONFIG=~/.kube/config kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{\"\\n\"}{end}'", check=False)
             images = []
             if res_img.exit_status == 0 and res_img.stdout:
                 img_set = set()
