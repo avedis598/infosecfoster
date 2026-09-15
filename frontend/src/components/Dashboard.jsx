@@ -592,7 +592,7 @@ export default function Dashboard({ user }) {
                   {overviewData.pods.map((p, i) => (
                     <div key={i} className="bg-obsidian border border-white/5 rounded-lg p-3 flex flex-col gap-1">
                       <span className="text-xs font-bold text-gray-300 truncate" title={p.name}>{p.name.split('/')[1] || p.name}</span>
-                      <span className={`text-[10px] uppercase font-bold tracking-widest ${p.status === 'Running' || p.status === 'Completed' ? 'text-emerald-500' : 'text-amber-500'}`}>{p.status}</span>
+                      <span className={`text-[10px] uppercase font-bold tracking-widest ${['Running', 'Completed'].includes(p.status) ? 'text-emerald-500' : ['CrashLoopBackOff', 'Error', 'Failed', 'ImagePullBackOff', 'ErrImagePull'].includes(p.status) ? 'text-red-500' : 'text-amber-500'}`}>{p.status}</span>
                     </div>
                   ))}
                 </div>
