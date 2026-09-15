@@ -11,17 +11,24 @@ class CloudOrchestrator:
         self.alert_email = alert_email
         self.db = db
 
-    def _update_db_status(self, step_id, status):
-        if self.db:
-            try:
+    def _update_db_status(self, updates):
+        if not self.db: return
+        try:
+            if not hasattr(self, '_client_doc_id'):
                 doc_ref = self.db.collection('clients').where('client_id', '==', self.client_id).limit(1).get()
                 if doc_ref:
-                    doc = doc_ref[0]
-                    self.db.collection('clients').document(doc.id).update({
-                        f'step_status.{step_id}': status
-                    })
-            except Exception as e:
-                pass
+                    self._client_doc_id = doc_ref[0].id
+                else:
+                    return
+            
+            update_dict = {}
+            for step_id, status in updates.items():
+                update_dict[f'step_status.{step_id}'] = status
+                
+            if update_dict:
+                self.db.collection('clients').document(self._client_doc_id).update(update_dict)
+        except Exception as e:
+            pass
 
     async def log(self, msg, status="cmd"):
         color = "\x1b[37m" # white
@@ -95,11 +102,18 @@ class CloudOrchestrator:
                 if ok:
                     await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
                     await self.log(f"  ✓ Already done — {title}", "ok")
-                    self._update_db_status(step["id"], "success")
+                    self._update_db_status({step["id"]: "success"})
                     continue
 
             await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
-            self._update_db_status(step["id"], "running")
+            
+            updates = {step["id"]: "running"}
+            current_global_idx = next((i for i, s in enumerate(all_steps) if s["id"] == step["id"]), -1)
+            if current_global_idx != -1:
+                for subsequent_step in all_steps[current_global_idx + 1:]:
+                    updates[subsequent_step["id"]] = "need_rerun"
+                    
+            self._update_db_status(updates)
             step_ok = True
             for i, cmd_dict in enumerate(step.get("cmds", [])):
                 label = cmd_dict.get("label", f"Step {i+1}")
@@ -193,15 +207,9 @@ class CloudOrchestrator:
                     break
                     
             if step_ok:
-                self._update_db_status(step["id"], "success")
+                self._update_db_status({step["id"]: "success"})
             else:
-                self._update_db_status(step["id"], "failed")
-                
-                # Mark all subsequent target steps as need_rerun
-                current_idx = target_steps.index(step)
-                for remaining in target_steps[current_idx + 1:]:
-                    self._update_db_status(remaining["id"], "need_rerun")
-
+                self._update_db_status({step["id"]: "failed"})
                 await self.log("DEPLOYMENT HALTED DUE TO ERRORS.", "fail")
                 return False
 
