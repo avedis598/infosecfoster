@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '../firebase'
 import ModuleTree from './ModuleTree'
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore'
 import { LogOut, Terminal as TerminalIcon, Play, ArrowLeft, CheckCircle2, Activity, X, Server, Shield, Database, LayoutDashboard, Settings2, RefreshCcw, ExternalLink } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Terminal } from '@xterm/xterm'
@@ -216,9 +216,8 @@ export default function Dashboard({ user }) {
   ]
 
   useEffect(() => {
-    const fetchClient = async () => {
-      const docRef = doc(db, 'clients', id)
-      const docSnap = await getDoc(docRef)
+    const docRef = doc(db, 'clients', id)
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() }
         setClient(data)
@@ -226,8 +225,8 @@ export default function Dashboard({ user }) {
       } else {
         navigate('/')
       }
-    }
-    fetchClient()
+    })
+    return () => unsubscribe()
   }, [id, navigate])
 
   
@@ -506,6 +505,7 @@ export default function Dashboard({ user }) {
                     modulesHierarchy={modulesHierarchy} 
                     selectedSteps={selectedSteps} 
                     setSelectedSteps={setSelectedSteps} 
+                    stepStatus={client.step_status || {}} 
                   />
                 </div>
                 

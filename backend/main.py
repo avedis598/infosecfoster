@@ -130,7 +130,7 @@ async def deploy_siem(websocket: WebSocket, client_id: str, ip: str, username: s
         async with asyncssh.connect(ip, username=username, client_keys=[key], known_hosts=None) as conn:
             await websocket.send_text("\r\n\x1b[32m[SUCCESS] Connected! Initializing Cloud Orchestrator...\x1b[0m\r\n")
             
-            orchestrator = CloudOrchestrator(ws=websocket, conn=conn, client_id=client_id)
+            orchestrator = CloudOrchestrator(ws=websocket, conn=conn, client_id=client_id, db=db if 'db' in globals() else None)
             await orchestrator.run_steps(step_list, is_force, debug=(debug.lower() == 'true'))
             
     except Exception as e:

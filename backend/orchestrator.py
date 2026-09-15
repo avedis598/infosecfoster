@@ -3,12 +3,25 @@ import json
 import urllib.request
 
 class CloudOrchestrator:
-    def __init__(self, ws, conn, client_id, domain="infosecfoster.com", alert_email="admin@infosecfoster.com"):
+    def __init__(self, ws, conn, client_id, domain="infosecfoster.com", alert_email="admin@infosecfoster.com", db=None):
         self.ws = ws
         self.conn = conn
         self.client_id = client_id
         self.domain = domain
         self.alert_email = alert_email
+        self.db = db
+
+    def _update_db_status(self, step_id, status):
+        if self.db:
+            try:
+                doc_ref = self.db.collection('clients').where('client_id', '==', self.client_id).limit(1).get()
+                if doc_ref:
+                    doc = doc_ref[0]
+                    self.db.collection('clients').document(doc.id).update({
+                        f'step_status.{step_id}': status
+                    })
+            except Exception as e:
+                pass
 
     async def log(self, msg, status="cmd"):
         color = "\x1b[37m" # white
@@ -82,10 +95,11 @@ class CloudOrchestrator:
                 if ok:
                     await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
                     await self.log(f"  ✓ Already done — {title}", "ok")
+                    self._update_db_status(step["id"], "success")
                     continue
 
             await self.log(f"\n{'─'*50}\n[{step_mode.upper()}] {title}", "head")
-            
+            self._update_db_status(step["id"], "running")
             step_ok = True
             for i, cmd_dict in enumerate(step.get("cmds", [])):
                 label = cmd_dict.get("label", f"Step {i+1}")
@@ -178,7 +192,16 @@ class CloudOrchestrator:
                     step_ok = False
                     break
                     
-            if not step_ok:
+            if step_ok:
+                self._update_db_status(step["id"], "success")
+            else:
+                self._update_db_status(step["id"], "failed")
+                
+                # Mark all subsequent target steps as need_rerun
+                current_idx = target_steps.index(step)
+                for remaining in target_steps[current_idx + 1:]:
+                    self._update_db_status(remaining["id"], "need_rerun")
+
                 await self.log("DEPLOYMENT HALTED DUE TO ERRORS.", "fail")
                 return False
 
