@@ -10,7 +10,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
 /* ==================== DEPLOY TERMINAL COMPONENT ==================== */
-const DeployTerminal = ({ client, selectedSteps, forceExecute, onComplete, wsUrl }) => {
+const DeployTerminal = ({ client, selectedSteps, forceExecute, debugMode, onComplete, wsUrl }) => {
   const terminalRef = useRef(null)
   const termInstance = useRef(null)
   const wsInstance = useRef(null)
@@ -545,7 +545,8 @@ export default function Dashboard({ user }) {
                     <DeployTerminal 
                       client={editClient} 
                       selectedSteps={selectedSteps}
-                      forceExecute={forceExecute} 
+                      forceExecute={forceExecute}
+                      debugMode={debugMode} 
                       wsUrl={wsUrl}
                       onComplete={handleDeployComplete} 
                     />
