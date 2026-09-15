@@ -83,6 +83,9 @@ export default function Dashboard({ user }) {
   const [debugMode, setDebugMode] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
+  useEffect(() => {
+    if (activeTab !== 'Setup') setTerminalMounted(false)
+  }, [activeTab])
   const [showTerminal, setShowTerminal] = useState(false)
   const [sshKeyStatus, setSshKeyStatus] = useState('checking') // checking, missing, exists
   const [sshKeyInput, setSshKeyInput] = useState('')
