@@ -4,3 +4,9 @@ config.json
 *.key
 .env
 secrets/
+.DS_Store
+__pycache__/
+frontend/.firebase/
+apps/
+*.pyc
+

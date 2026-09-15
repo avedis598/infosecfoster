@@ -79,10 +79,7 @@ class AMLSiemApp(tk.Tk):
             messagebox.showerror("Error", "Connect to the cluster first via the Connection tab.")
             return
 
-        shuffle_api_key = self.tab_conn.shuffle_api_key_var.get().strip()
-        if not shuffle_api_key:
-            messagebox.showerror("Error", "Please enter the Shuffle API Key in the Connection tab.")
-            return
+        # API key is now fetched automatically via script, no need to check UI box
 
         import os, json, base64
         pb_path = os.path.join("playbooks", playbook_filename)
@@ -120,24 +117,24 @@ class AMLSiemApp(tk.Tk):
         messagebox.showinfo("Installing Playbook", f"Deploying {playbook_filename} in the background. Please wait.")
         import threading
         def worker():
+            client_id = self.config.get("client_id", "aml-lab")
             script = f"""
 import urllib.request, json, ssl, sys, uuid, base64
 
-shuffle_url = "http://shuffle-backend.aml-lab.svc.cluster.local:5001"
-api_key = "{shuffle_api_key}"
-headers = {{"Authorization": f"Bearer {{api_key}}", "Content-Type": "application/json"}}
+shuffle_url = "http://shuffle-backend.{client_id}.svc.cluster.local:5001"
+try:
+    # Auto-login to get session token
+    req_login = urllib.request.Request(f"{{shuffle_url}}/api/v1/login", data=json.dumps({{"username":"admin","password":"Admin1234!"}}).encode(), headers={{"Content-Type": "application/json"}})
+    res_login = urllib.request.urlopen(req_login, timeout=10)
+    cookies = json.loads(res_login.read()).get("cookies", [])
+    api_key = cookies[0]["value"] if cookies else ""
+except Exception as e:
+    print(f"Failed to login to Shuffle: {{e}}")
+    sys.exit(1)
 
-bundled_apps_b64 = {bundled_apps_str}
-for b64 in bundled_apps_b64:
-    app_json = base64.b64decode(b64).decode()
-    try:
-        install_req = urllib.request.Request(f"{{shuffle_url}}/api/v1/apps", data=app_json.encode(), headers=headers, method="POST")
-        install_res = urllib.request.urlopen(install_req, timeout=10)
-        print("DEBUG: Successfully auto-installed bundled app")
-    except urllib.error.HTTPError as e:
-        print(f"DEBUG: Bundled app auto-install skipped/failed: {{e.read().decode()[:200]}}")
-    except Exception as e:
-        print(f"DEBUG: Bundled app auto-install error: {{e}}")
+headers = {{"Content-Type": "application/json", "Cookie": f"session_token={{api_key}}"}}
+
+    # Removed auto-upload logic because Shuffle API does not support POST /api/v1/apps for raw JSON.
 
 try:
     req = urllib.request.Request(f"{{shuffle_url}}/api/v1/apps", headers=headers)
@@ -165,6 +162,8 @@ if apps:
 else:
     print("WARNING: No apps returned from /api/v1/apps API!")
 
+missing_apps = set()
+
 # Dynamically map App IDs for actions
 for action in workflow.get("actions", []):
     app_name = action.get("app_name")
@@ -175,17 +174,28 @@ for action in workflow.get("actions", []):
             action["app_id"] = matched_app["id"]
             action["app_version"] = matched_app["app_version"]
         else:
-            print(f"DEBUG: WARNING! Could not find Action App '{{app_name}}' (case-insensitive) in cluster! This may cause deploy failure.")
+            print(f"DEBUG: WARNING! Could not find Action App '{{app_name}}' (case-insensitive) in cluster!")
+            missing_apps.add(app_name)
 
 # Dynamically map App IDs for triggers
 for trigger in workflow.get("triggers", []):
     app_name = trigger.get("app_name")
     if app_name:
+        # Built-in triggers don't exist in the apps list and don't need app_id mapping
+        if app_name.lower() in ["webhook", "user input", "schedule"]:
+            continue
+            
         matched_app = next((a for a in apps if a.get("name", "").lower() == app_name.lower()), None)
         if matched_app:
             print(f"DEBUG: Mapped Trigger App '{{app_name}}' to ID '{{matched_app['id']}}'")
             trigger["app_id"] = matched_app["id"]
             trigger["app_version"] = matched_app["app_version"]
+        else:
+            missing_apps.add(app_name)
+
+if missing_apps:
+    print(f"FAIL_MISSING_APPS:{{', '.join(missing_apps)}}")
+    sys.exit(1)
 
 # Remove org_id which can cause 'success: false' error if it belongs to another cluster
 if "org_id" in workflow:
@@ -206,13 +216,20 @@ try:
 except urllib.error.HTTPError as e:
     print(f"Failed to deploy workflow: {{e.read().decode()}}")
 """
-            import base64
-            script_b64 = base64.b64encode(script.encode()).decode()
-            cmd = f"KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{{.items[0].metadata.name}}') -c wazuh-manager -- sh -c 'echo {script_b64} | base64 -d | python3'"
-            ok, out = self.ssh.run(cmd)
+            bash_script = f"""cat << 'EOF_PYTHON_SCRIPT' | KUBECONFIG=~/.kube/config kubectl exec -i -n {client_id} $(KUBECONFIG=~/.kube/config kubectl get pods -n {client_id} -l node-role=master -o jsonpath='{{.items[0].metadata.name}}') -c wazuh-manager -- python3
+{script}
+EOF_PYTHON_SCRIPT
+"""
+            ok, out = self.ssh.run_script(bash_script)
             
             if ok and "SUCCESS" in out:
                 self.after(0, lambda: messagebox.showinfo("Success", f"{playbook_filename} successfully installed into Shuffle SOAR!"))
+            elif out and "FAIL_MISSING_APPS:" in out:
+                for line in out.splitlines():
+                    if line.startswith("FAIL_MISSING_APPS:"):
+                        missing = line.split("FAIL_MISSING_APPS:")[1]
+                        self.after(0, lambda m=missing: messagebox.showerror("Missing Apps", f"The following apps are required but not found in Shuffle:\n\n{m}\n\nPlease manually import these apps in the Shuffle UI before deploying this playbook."))
+                        break
             else:
                 with open("shuffle_debug.log", "w") as f:
                     f.write(out)
@@ -239,22 +256,23 @@ except urllib.error.HTTPError as e:
                 self.after(0, lambda: self.tab_overview.set_data([], [], error="Not connected"))
                 return
             
-            script = """
+            client_id = getattr(self, "config", {}).get("client_id", "aml-lab")
+            script = f"""
 import subprocess, json
 try:
-    res = subprocess.run(["/usr/local/bin/kubectl", "get", "pods", "-n", "aml-lab", "-o", "json"], capture_output=True, text=True, env={"KUBECONFIG": "/home/amlak-siem-admin/.kube/config"})
+    res = subprocess.run(["/usr/local/bin/kubectl", "get", "pods", "-n", "{client_id}", "-o", "json"], capture_output=True, text=True, env={{"KUBECONFIG": "/home/amlak-siem-admin/.kube/config"}})
     if res.returncode != 0:
-        print(json.dumps({"error": res.stderr}))
+        print(json.dumps({{"error": res.stderr}}))
         exit(0)
     data = json.loads(res.stdout)
     pods = []
     tools = set()
     for item in data.get("items", []):
-        p_name = item.get("metadata", {}).get("name", "Unknown")
-        status = item.get("status", {}).get("phase", "Unknown")
+        p_name = item.get("metadata", {{}}).get("name", "Unknown")
+        status = item.get("status", {{}}).get("phase", "Unknown")
         
         c_names = []
-        for c in item.get("spec", {}).get("containers", []):
+        for c in item.get("spec", {{}}).get("containers", []):
             c_names.append(c.get("name", ""))
             img = c.get("image", "")
             if img:
@@ -264,12 +282,12 @@ try:
                     name, tag = img, "latest"
                 tools.add((name, tag))
                 
-        pods.append({"name": p_name, "status": status, "containers": c_names})
+        pods.append({{"name": p_name, "status": status, "containers": c_names}})
         
-    versions = [{"name": n, "version": t} for n, t in sorted(list(tools))]
-    print(json.dumps({"pods": pods, "versions": versions}))
+    versions = [{{"name": n, "version": t}} for n, t in sorted(list(tools))]
+    print(json.dumps({{"pods": pods, "versions": versions}}))
 except Exception as e:
-    print(json.dumps({"error": str(e)}))
+    print(json.dumps({{"error": str(e)}}))
 """
             import base64
             script_b64 = base64.b64encode(script.encode()).decode()
@@ -301,11 +319,13 @@ except Exception as e:
                 self.after(0, lambda: self.tab_wazuh.set_alert_stats({"Total": "Err", "Level 12+": "Err", "Auth Failure": "Err", "Auth Success": "Err"}))
                 return
                 
-            script = """
-import subprocess, urllib.request, json, ssl
+            client_id = self.config.get("client_id", "aml-lab")
+            script = f"""
+import subprocess, urllib.request, json, ssl, sys, base64
+client_id = "{client_id}"
 
-stats = {"agents": {"Total": "0", "Active": "0", "Disconnected": "0", "Pending": "0", "Never connected": "0"},
-         "alerts": {"Total": "0", "Level 12+": "0", "Auth Failure": "0", "Auth Success": "0"}}
+stats = {{"agents": {{"Total": "0", "Active": "0", "Disconnected": "0", "Pending": "0", "Never connected": "0"}},
+         "alerts": {{"Total": "0", "Level 12+": "0", "Auth Failure": "0", "Auth Success": "0"}}}}
 
 # 1. Agent Stats
 try:
@@ -334,28 +354,28 @@ except Exception:
 import datetime
 now = datetime.datetime.utcnow()
 past = now - datetime.timedelta(days=1)
-time_filter = {"range": {"@timestamp": {"gte": past.strftime("%Y-%m-%dT%H:%M:%SZ"), "lte": now.strftime("%Y-%m-%dT%H:%M:%SZ")}}}
+time_filter = {{"range": {{"@timestamp": {{"gte": past.strftime("%Y-%m-%dT%H:%M:%SZ"), "lte": now.strftime("%Y-%m-%dT%H:%M:%SZ")}}}}}}
 
-os_url = "http://opensearch-proxy.aml-lab.svc.cluster.local:9200/wazuh-alerts-*/_count"
+os_url = f"http://opensearch-proxy.{{client_id}}.svc.cluster.local:9200/wazuh-alerts-*/_count"
 
 def get_count(query):
     try:
-        req = urllib.request.Request(os_url, data=json.dumps(query).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        req = urllib.request.Request(os_url, data=json.dumps(query).encode(), headers={{"Content-Type": "application/json"}}, method="POST")
         with urllib.request.urlopen(req, timeout=5) as res:
             return str(json.loads(res.read()).get("count", 0))
     except Exception:
         return "Err2"
 
-stats["alerts"]["Total"] = get_count({"query": {"bool": {"filter": [time_filter]}}})
-stats["alerts"]["Level 12+"] = get_count({"query": {"bool": {"filter": [time_filter, {"range": {"rule.level": {"gte": 12}}}]}}})
-stats["alerts"]["Auth Failure"] = get_count({"query": {"bool": {"filter": [time_filter, {"match": {"rule.groups": "authentication_failed"}}]}}})
-stats["alerts"]["Auth Success"] = get_count({"query": {"bool": {"filter": [time_filter, {"match": {"rule.groups": "authentication_success"}}]}}})
+stats["alerts"]["Total"] = get_count({{"query": {{"bool": {{"filter": [time_filter]}}}}}})
+stats["alerts"]["Level 12+"] = get_count({{"query": {{"bool": {{"filter": [time_filter, {{"range": {{"rule.level": {{"gte": 12}}}}}} ]}}}}}})
+stats["alerts"]["Auth Failure"] = get_count({{"query": {{"bool": {{"filter": [time_filter, {{"match": {{"rule.groups": "authentication_failed"}}}}]}}}}}})
+stats["alerts"]["Auth Success"] = get_count({{"query": {{"bool": {{"filter": [time_filter, {{"match": {{"rule.groups": "authentication_success"}}}}]}}}}}})
 
 print(json.dumps(stats))
 """
             import base64
             script_b64 = base64.b64encode(script.encode()).decode()
-            cmd = f"KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o jsonpath='{{.items[0].metadata.name}}') -c wazuh-manager -- sh -c 'echo {script_b64} | base64 -d | python3'"
+            cmd = f"KUBECONFIG=~/.kube/config kubectl exec -n {client_id} $(KUBECONFIG=~/.kube/config kubectl get pods -n {client_id} -l node-role=master -o jsonpath='{{.items[0].metadata.name}}') -c wazuh-manager -- sh -c 'echo {script_b64} | base64 -d | python3'"
             ok, out = self.ssh.run(cmd)
 
             
@@ -378,6 +398,7 @@ print(json.dumps(stats))
         threading.Thread(target=worker, daemon=True).start()
 
     def _populate_config(self, config_data):
+        if "client_id" in config_data: self.tab_conn.client_id_var.set(config_data["client_id"])
         if "host" in config_data: self.tab_conn.host_var.set(config_data["host"])
         if "user" in config_data: self.tab_conn.user_var.set(config_data["user"])
         if "key_path" in config_data: self.tab_conn.key_var.set(config_data["key_path"])
@@ -410,6 +431,7 @@ print(json.dumps(stats))
                 return
         
         save_config({
+            "client_id": self.tab_conn.client_id_var.get(),
             "host": self.tab_conn.host_var.get(),
             "user": self.tab_conn.user_var.get(),
             "key_path": self.tab_conn.key_var.get(),
@@ -444,6 +466,7 @@ print(json.dumps(stats))
         
         # Save config
         save_config({
+            "client_id": self.tab_conn.client_id_var.get(),
             "host": host,
             "user": user,
             "key_path": key,
@@ -483,12 +506,15 @@ print(json.dumps(stats))
             client_conf = get_active_client_config()
             domain = client_conf.get("cf_domain", "amlsiem.com")
             
-            self.tab_wazuh.set_url(f"https://wazuh.aml-lab.{domain}")
-            self.tab_thehive.set_url(f"https://thehive.aml-lab.{domain}")
-            self.tab_shuffle.set_url(f"https://shuffle.aml-lab.{domain}")
-            self.tab_grafana.set_urls(
-                url=f"https://grafana.aml-lab.{domain}/d/unified/unified-siem-dashboard"
-            )
+            if domain:
+                client_id = self.config.get("client_id", "aml-lab")
+                self.tab_wazuh.set_url(f"https://wazuh.{client_id}.{domain}")
+                self.tab_thehive.set_url(f"https://thehive.{client_id}.{domain}")
+                self.tab_shuffle.set_url(f"https://shuffle.{client_id}.{domain}")
+                if hasattr(self, "tab_grafana"):
+                    self.tab_grafana.set_urls(
+                        url=f"https://grafana.{client_id}.{domain}/d/unified/unified-siem-dashboard"
+                    )
             
             # Trigger initial fetches
             self._fetch_overview()

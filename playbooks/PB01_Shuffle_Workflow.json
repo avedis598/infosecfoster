@@ -105,9 +105,18 @@
       "destination_id": "1deed149-099b-48db-828b-9348f205f8d2",
       "conditions": [
         {
-          "condition": "matches regex",
-          "source": "$exec.text.rule.id",
-          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          "condition": {
+            "name": "",
+            "value": "matches regex"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.id"
+          },
+          "destination": {
+            "name": "",
+            "value": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          }
         }
       ]
     },
@@ -117,9 +126,18 @@
       "destination_id": "42b6e534-bb18-4efa-bcd0-582131fec0dc",
       "conditions": [
         {
-          "condition": "matches regex",
-          "source": "$exec.text.rule.id",
-          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          "condition": {
+            "name": "",
+            "value": "matches regex"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.id"
+          },
+          "destination": {
+            "name": "",
+            "value": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          }
         }
       ]
     },
@@ -129,9 +147,18 @@
       "destination_id": "1d15c1cc-bc3d-4d68-aff5-ce056847951a",
       "conditions": [
         {
-          "condition": "matches regex",
-          "source": "$exec.text.rule.id",
-          "destination": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          "condition": {
+            "name": "",
+            "value": "matches regex"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.id"
+          },
+          "destination": {
+            "name": "",
+            "value": "^(5710|5711|5712|5715|5716|5720|5758|5760|5763)$"
+          }
         }
       ]
     }

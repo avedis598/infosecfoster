@@ -3,7 +3,7 @@
     "legacy": {
       "name": "Legacy Client",
       "tier": "Tier A",
-      "host": "34.18.98.101",
+      "host": "104.198.8.20",
       "port": "22",
       "username": "amlak-siem-admin",
       "ssh_key": "/Users/sanathalishaikh/.ssh/aml_siem_key",
@@ -12,7 +12,9 @@
       "cf_domain": "infosecfoster.com",
       "user": "amlak-siem-admin",
       "key_path": "~/.ssh/aml_siem_key",
-      "alert_email": "sheikhsanath12@gmail.com"
+      "alert_email": "sheikhsanath12@gmail.com",
+      "shuffle_api_key": "",
+      "client_id": "aml-lab"
     },
     "foodchoice": {
       "name": "foodchoice",

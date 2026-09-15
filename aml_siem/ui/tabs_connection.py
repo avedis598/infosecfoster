@@ -18,6 +18,7 @@ class ConnectionTab(tk.Frame):
         self.shuffle_api_key_var = tk.StringVar()
         self.cf_token_var = tk.StringVar()
         self.cf_zone_var = tk.StringVar()
+        self.client_id_var = tk.StringVar(value="aml-lab")
         
         self.conn_status_var = tk.StringVar(value="Not Connected")
         self.conn_status_lbl = None
@@ -49,6 +50,7 @@ class ConnectionTab(tk.Frame):
         grid.columnconfigure(1, weight=1)
 
         fields = [
+            ("Client ID:", self.client_id_var),
             ("IP Address / Host:", self.host_var),
             ("SSH Username:", self.user_var),
             ("Private Key Path:", self.key_var),
@@ -67,7 +69,7 @@ class ConnectionTab(tk.Frame):
                              insertbackground=C["text"], font=FONT_STEP, relief="flat", bd=5, width=30)
             entry.pack(side="left", fill="x", expand=True)
             
-            if i == 2: # Key path gets browse button
+            if i == 3: # Key path gets browse button
                 FlatBtn(f_frame, text="Browse", bg=C["border"], fg=C["text"], command=self.on_browse_key, 
                         padx=10, pady=2, font=FONT_STEP).pack(side="left", padx=(10,0))
 

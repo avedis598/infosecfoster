@@ -152,16 +152,7 @@ chmod 640 /var/ossec/etc/rules/local_rules.xml'
         "cmds": [
             {
                 "label": "Deploy ClickHouse StatefulSet and Service",
-                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'    - name: SIEM-Telemetry
-      uid: SIEM-Telemetry
-      type: grafana-opensearch-datasource
-      url: http://opensearch.aml-lab.svc.cluster.local:9200
-      access: proxy
-      jsonData:
-        database: "siem-telemetry"
-        timeField: "timestamp"
-        version: "OpenSearch"
-INNER'
+                "cmd": r"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
 apiVersion: v1
 kind: Service
 metadata:
@@ -521,11 +512,11 @@ metadata:
   name: grafana-ingress
   namespace: aml-lab
   annotations:
-    kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
+  ingressClassName: nginx
   tls:
   - hosts:
     - grafana.aml-lab.infosecfoster.com
@@ -568,7 +559,7 @@ INNER
             },
             {
                 "label": "Gate: Check Grafana HTTP API",
-                "cmd": "GRAFANA_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l app=grafana -o jsonpath='{.items[0].metadata.name}'); KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $GRAFANA_POD -- curl -s http://localhost:3000/api/health | grep -q '\"database\": \"ok\"' && echo 'GATE_PASS: Grafana API OK' || (echo 'GATE_FAIL: Grafana API failed' && exit 1)"
+                "cmd": "GRAFANA_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l app=grafana -o jsonpath='{.items[0].metadata.name}'); for i in {1..10}; do if KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $GRAFANA_POD -- curl -s http://localhost:3000/api/health | grep -q '\"database\": \"ok\"'; then echo 'GATE_PASS: Grafana API OK'; exit 0; fi; echo 'Waiting for Grafana API...'; sleep 5; done; echo 'GATE_FAIL: Grafana API failed'; exit 1"
             }
         ]
     },
@@ -634,8 +625,8 @@ awk '/<\/ossec_config>/ { while((getline line < \"/tmp/office365_patch.xml\") > 
                 "label": "Install Python deps and fetch SigmaHQ repo",
                 "cmd": r"""
 set -e
-sudo apt-get -o Dpkg::Lock::Timeout=120 update
-sudo apt-get -o Dpkg::Lock::Timeout=120 install -y python3-pip python3-yaml git
+sudo apt-get -o Dpkg::Lock::Timeout=120 update >/dev/null 2>&1
+sudo DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Lock::Timeout=120 install -y python3-pip python3-yaml git >/dev/null 2>&1
 rm -rf /tmp/sigma
 git clone https://github.com/SigmaHQ/sigma.git /tmp/sigma
 """
