@@ -15,7 +15,7 @@ M2_STEPS = [
         "mode": 'remote',
         "title": 'Gate Verification — M2.1 Shuffle SOAR',
         "desc": 'Verify Shuffle UI loads over HTTPS and internal components are reachable.',
-        "cmds": [{'label': 'Gate: Check Shuffle UI HTTPS status code', 'cmd': "(echo 'Checking Shuffle Ingress UI...' && for i in {1..20}; do if curl -k -s --resolve shuffle.aml-lab.infosecfoster.com:443:127.0.0.1 https://shuffle.aml-lab.infosecfoster.com | grep -qiE 'shuffle|location:'; then echo 'GATE_PASS: Shuffle UI loads over HTTPS' && exit 0; fi; sleep 5; done; echo 'GATE_FAIL: Shuffle UI not responding' && exit 1)"}],
+        "cmds": [{'label': 'Gate: Check Shuffle UI HTTPS status code', 'cmd': "(echo 'Checking Shuffle Ingress UI...' && for i in {1..20}; do if curl -k -s --resolve shuffle.aml-lab.infosecfoster.com:443:$(KUBECONFIG=~/.kube/config kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath={.spec.clusterIP}) https://shuffle.aml-lab.infosecfoster.com | grep -qiE 'shuffle|location:'; then echo 'GATE_PASS: Shuffle UI loads over HTTPS' && exit 0; fi; sleep 5; done; echo 'GATE_FAIL: Shuffle UI not responding' && exit 1)"}],
     },
     {
         "id": '2.M2.2',
@@ -51,7 +51,7 @@ M2_STEPS = [
         "mode": 'remote',
         "title": 'Gate Verification — M2.3 TheHive 5.2',
         "desc": 'Verify TheHive UI loads over HTTPS and internal APIs are accessible.',
-        "cmds": [{'label': 'Gate: Check TheHive UI HTTPS status code', 'cmd': '(echo \'Checking TheHive Ingress UI...\' && for i in {1..40}; do HTTP=$(curl -k -s -o /dev/null -w \'%{http_code}\' --resolve thehive.aml-lab.infosecfoster.com:443:127.0.0.1 https://thehive.aml-lab.infosecfoster.com 2>/dev/null); if echo $HTTP | grep -qE \'^(200|302|303|401)$\'; then echo "GATE_PASS: TheHive UI loads over HTTPS (HTTP $HTTP)" && exit 0; fi; echo "Attempt $i/40: HTTP $HTTP — waiting..."; sleep 8; done; echo \'GATE_FAIL: TheHive UI not responding after 320s\' && exit 1)'}],
+        "cmds": [{'label': 'Gate: Check TheHive UI HTTPS status code', 'cmd': '(echo \'Checking TheHive Ingress UI...\' && for i in {1..40}; do HTTP=$(curl -k -s -o /dev/null -w \'%{http_code}\' --resolve thehive.aml-lab.infosecfoster.com:443:$(KUBECONFIG=~/.kube/config kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath={.spec.clusterIP}) https://thehive.aml-lab.infosecfoster.com 2>/dev/null); if echo $HTTP | grep -qE \'^(200|302|303|401)$\'; then echo "GATE_PASS: TheHive UI loads over HTTPS (HTTP $HTTP)" && exit 0; fi; echo "Attempt $i/40: HTTP $HTTP — waiting..."; sleep 8; done; echo \'GATE_FAIL: TheHive UI not responding after 320s\' && exit 1)'}],
     },
     {
         "id": '2.M2.4',
