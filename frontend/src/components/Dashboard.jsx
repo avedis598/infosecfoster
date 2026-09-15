@@ -24,7 +24,7 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, onComplete, wsUrl
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 12,
       cursorBlink: false,
-      disableStdin: true // Read-only terminal
+      disableStdin: true, scrollback: 99999 // Read-only terminal
     })
     
     const fitAddon = new FitAddon()
@@ -706,7 +706,7 @@ function SSH_XTerm({ clientId, ip, username }) {
       cursorBlink: true,
       theme: { background: '#000000', foreground: '#d4d4d4', cursor: '#8a2be2' },
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 14
+      fontSize: 14, scrollback: 99999
     });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
