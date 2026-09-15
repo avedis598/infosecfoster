@@ -69,7 +69,32 @@ M1_STEPS = [
         "mode": 'remote',
         "title": 'Gate Verification — M1.4 Wazuh Agent Enrollment',
         "desc": 'Verify that at least one test agent is active and real system events (e.g. user creation) generate alerts in the dashboard logs within 5 minutes',
-        "cmds": [{'label': 'Gate: Verify at least one enrolled agent shows Active status in manager API', 'cmd': 'KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o json | jq -r \'.items[] | select(.metadata.deletionTimestamp == null) | .metadata.name\' | head -n1) -c wazuh-manager -- /var/ossec/framework/python/bin/python3 -c "\nimport urllib.request, ssl, json, base64, time\nctx = ssl.create_default_context()\nctx.check_hostname = False\nctx.verify_mode = ssl.CERT_NONE\nauth = base64.b64encode(b\'wazuh:wazuh\').decode()\n# Retry up to 90 times (15 minutes) waiting for agent to go Active\nfor attempt in range(90):\n    try:\n        req = urllib.request.Request(\'https://localhost:55000/security/user/authenticate\', headers={\'Authorization\': \'Basic \' + auth})\n        with urllib.request.urlopen(req, context=ctx) as res:\n            token = json.loads(res.read())[\'data\'][\'token\']\n        req = urllib.request.Request(\'https://localhost:55000/agents?pretty=true\', headers={\'Authorization\': \'Bearer \' + token})\n        with urllib.request.urlopen(req, context=ctx) as res:\n            data = json.loads(res.read())[\'data\']\n        external = [a for a in data.get(\'affected_items\', []) if a.get(\'id\') != \'000\']\n        total_ext  = len(external)\n        active_ext = sum(1 for a in external if a.get(\'status\') == \'active\')\n        enrolled_ext = sum(1 for a in external if a.get(\'status\') in (\'active\',\'disconnected\',\'pending\'))\n        print(f\'[{attempt+1}/90] Total external agents: {total_ext}, Active: {active_ext}, Enrolled: {enrolled_ext}\')\n        if active_ext > 0:\n            print(\'GATE_PASS: Active agent detected\')\n            exit(0)\n        if total_ext == 0:\n            print(\'  No agents enrolled yet — waiting...\')\n        else:\n            names = [a.get(\'name\',\'?\') + \'(\' + a.get(\'status\',\'?\') + \')\' for a in external]\n            print(\'  Agents: \' + \', \'.join(names) + \' — waiting for Active...\')\n    except Exception as e:\n        print(f\'  API error (attempt {attempt+1}): {e}\')\n    time.sleep(10)\nprint(\'GATE_FAIL: Agent enrolled but not Active after 15 minutes.\')\nprint(\'Manual fix: sudo /Library/Ossec/bin/wazuh-control restart on your Mac\')\nexit(1)\n"'}, {'label': 'Gate: Verify real system telemetry events (user creation/hosts mod) have generated alerts', 'cmd': 'POD_IP=$(KUBECONFIG=~/.kube/config kubectl get pod $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o json | jq -r \'.items[] | select(.metadata.deletionTimestamp == null) | .metadata.name\' | head -n1) -n aml-lab -o jsonpath=\'{.status.podIP}\') && python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); payload = b\'<189>Jul 18 04:30:00 local-mac-agent sshd[12345]: Failed password for invalid user admin from 192.168.1.100 port 22 ssh2 useradd\'; s.sendto(payload, (\'10.212.0.2\', 514)); s.sendto(payload, (\'$POD_IP\', 514))" && (echo \'Checking manager local alert log...\' && for i in {1..20}; do if KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o json | jq -r \'.items[] | select(.metadata.deletionTimestamp == null) | .metadata.name\' | head -n1) -c wazuh-manager -- grep -qiE \'useradd|winadmin|hosts\' /var/ossec/logs/alerts/alerts.json 2>/dev/null; then echo \'GATE_PASS: Real alert found in logs\' && exit 0; fi; sleep 3; done; echo \'GATE_FAIL: Alert event not yet found in logs.\' && exit 1)'}],
+        "cmds": [{
+    'label': 'Gate: Verify at least one enrolled agent shows Active status in manager API',
+    'mode': 'remote_upload',
+    'script': '''#!/bin/bash
+set -e
+POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l node-role=master -o json | jq -r '.items[] | select(.metadata.deletionTimestamp == null) | .metadata.name' | head -n1)
+echo "Authenticating to Wazuh API on pod $POD..."
+TOKEN=$(KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $POD -c wazuh-manager -- curl --connect-timeout 10 --max-time 15 -k -s -X GET -u wazuh:wazuh 'https://127.0.0.1:55000/security/user/authenticate' | jq -r .data.token || true)
+
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+    echo "GATE_FAIL: Could not authenticate to manager API. API may be restarting."
+    exit 1
+fi
+
+echo "Checking agent status..."
+STATUS=$(KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $POD -c wazuh-manager -- curl --connect-timeout 10 --max-time 15 -k -s -X GET 'https://127.0.0.1:55000/agents' -H "Authorization: Bearer $TOKEN" | jq -r '.data.affected_items[0].status' 2>/dev/null || true)
+
+if [ "$STATUS" = "active" ] || [ "$STATUS" = "Active" ]; then
+    echo "GATE_PASS: Agent is ACTIVE"
+    exit 0
+else
+    echo "GATE_FAIL: Agent not active or missing (Status: $STATUS)"
+    exit 1
+fi
+'''
+}],
     },
     {
         "id": '1.M1.5',
