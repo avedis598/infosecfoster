@@ -16,10 +16,19 @@ class CloudOrchestrator:
         try:
             if not hasattr(self, '_client_doc_id'):
                 doc_ref = self.db.collection('clients').where('client_id', '==', self.client_id).limit(1).get()
+                if not doc_ref:
+                    doc_ref = self.db.collection('clients').where('name', '==', self.client_id).limit(1).get()
+                
                 if doc_ref:
                     self._client_doc_id = doc_ref[0].id
                 else:
-                    return
+                    # Try to see if client_id is actually the document ID
+                    doc_test = self.db.collection('clients').document(self.client_id).get()
+                    if doc_test.exists:
+                        self._client_doc_id = doc_test.id
+                    else:
+                        print(f"Warning: Could not find Firestore client document for {self.client_id}")
+                        return
             
             update_dict = {}
             for step_id, status in updates.items():
