@@ -147,7 +147,7 @@ class CloudOrchestrator:
                         script = cmd_dict.get("script", "")
                         if script:
                             # Write to temp file and bash it
-                            remote_cmd = f"cat << 'INNER_EOF' > /tmp/run.sh\n{script}\nINNER_EOF\nbash /tmp/run.sh && rm /tmp/run.sh"
+                            remote_cmd = f"cat << 'INNER_EOF' > /tmp/run.sh\n{script}\nINNER_EOF\nbash /tmp/run.sh && rm -f /tmp/run.sh"
                             ok, output = await self._run_remote(remote_cmd)
                         else:
                             ok, output = True, ""
