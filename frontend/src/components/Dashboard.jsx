@@ -41,7 +41,7 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, onComplete, wsUrl
     term.writeln('\x1b[35m[SYSTEM] Handing over to Cloud Orchestrator...\x1b[0m')
     
     // Connect to WebSocket
-    const ws = new WebSocket(`${wsUrl}/api/deploy/${clientId}?ip=${ip}&username=${username}&steps=${selectedSteps.join(',')}&force=${forceExecute}`)
+    const ws = new WebSocket(`${wsUrl}/api/deploy/${clientId}?ip=${ip}&username=${username}&steps=${selectedSteps.join(',')}&force=${forceExecute}&debug=${debugMode}`)
     wsInstance.current = ws
     
     ws.onmessage = (e) => {
@@ -80,6 +80,7 @@ export default function Dashboard({ user }) {
   const [selectedSteps, setSelectedSteps] = useState([])
   const [modulesHierarchy, setModulesHierarchy] = useState([])
   const [forceExecute, setForceExecute] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
@@ -505,15 +506,26 @@ export default function Dashboard({ user }) {
                   />
                 </div>
                 
-                <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm text-gray-300 hover:text-white transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="accent-emerald-500 w-4 h-4 cursor-pointer"
-                    checked={forceExecute}
-                    onChange={(e) => setForceExecute(e.target.checked)}
-                  />
-                  Force Execute (Skip Pre-checks)
-                </label>
+                                <div className="flex items-center gap-4 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                      checked={forceExecute}
+                      onChange={(e) => setForceExecute(e.target.checked)}
+                    />
+                    Force Execute
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="accent-violet w-4 h-4 cursor-pointer"
+                      checked={debugMode}
+                      onChange={(e) => setDebugMode(e.target.checked)}
+                    />
+                    Debug Mode
+                  </label>
+                </div>
                 <button onClick={handleDeploy} disabled={deploying} className="w-full py-4 bg-violet hover:bg-violet-hover disabled:opacity-50 text-white rounded-[12px] font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_var(--color-violet-glow)]">
                   <Play className="w-4 h-4 fill-current" /> {deploying ? 'Deploying...' : 'Initialize Run'}
                 </button>

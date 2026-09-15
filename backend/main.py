@@ -99,7 +99,7 @@ import asyncssh
 from orchestrator import CloudOrchestrator
 
 @app.websocket("/api/deploy/{client_id}")
-async def deploy_siem(websocket: WebSocket, client_id: str, ip: str, username: str, steps: str = "", force: str = "false"):
+async def deploy_siem(websocket: WebSocket, client_id: str, ip: str, username: str, steps: str = "", force: str = "false", debug: str = "false"):
     await websocket.accept()
     
     # 1. Fetch the SSH key from Secret Manager
@@ -131,7 +131,7 @@ async def deploy_siem(websocket: WebSocket, client_id: str, ip: str, username: s
             await websocket.send_text("\r\n\x1b[32m[SUCCESS] Connected! Initializing Cloud Orchestrator...\x1b[0m\r\n")
             
             orchestrator = CloudOrchestrator(ws=websocket, conn=conn, client_id=client_id)
-            await orchestrator.run_steps(step_list, is_force)
+            await orchestrator.run_steps(step_list, is_force, debug=(debug.lower() == 'true'))
             
     except Exception as e:
         await websocket.send_text(f"\r\n\x1b[31m[ERROR] Deployment failed: {str(e)}\x1b[0m\r\n")

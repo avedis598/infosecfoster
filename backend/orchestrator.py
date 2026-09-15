@@ -28,6 +28,10 @@ class CloudOrchestrator:
         cmd_str = cmd_str.replace("infosecfoster.com", self.domain)
         cmd_str = cmd_str.replace("aml-lab", self.client_id)
         
+        if getattr(self, "debug_mode", False):
+            cmd_str = cmd_str.replace("2>/dev/null", "").replace(">/dev/null 2>&1", "").replace(">/dev/null", "")
+            await self.ws.send_text(f"\x1b[36m[DEBUG CMD] {cmd_str}\x1b[0m\r\n")
+            
         try:
             result = await self.conn.run(cmd_str, check=False)
             output = result.stdout
@@ -37,7 +41,8 @@ class CloudOrchestrator:
         except Exception as e:
             return False, str(e)
 
-    async def run_steps(self, step_ids, is_force=False):
+    async def run_steps(self, step_ids, is_force=False, debug=False):
+        self.debug_mode = debug
         # Dynamically import all steps to build the full catalog
         all_steps = []
         try:
