@@ -61,7 +61,8 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, onComplete, wsUrl
       if (ws.readyState === WebSocket.OPEN) ws.close()
       term.dispose()
     }
-  }, [client, selectedSteps, forceExecute, wsUrl])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   
   return <div ref={terminalRef} className="w-full h-full p-4 overflow-hidden" />
 }
