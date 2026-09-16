@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase'
+import { ErrorBoundary } from './components/ErrorBoundary'
+
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import ClientList from './components/ClientList'
@@ -23,6 +25,7 @@ function App() {
   }
 
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route 
@@ -39,6 +42,7 @@ function App() {
         />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 
