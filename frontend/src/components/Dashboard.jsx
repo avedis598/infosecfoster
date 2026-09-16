@@ -845,7 +845,7 @@ export default function Dashboard({ user }) {
                     {[
                       { label: 'Total', val: wazuhData?.agents?.total ?? '-', color: wazuhData ? 'text-white' : 'text-gray-600' },
                       { label: 'Active', val: wazuhData?.agents?.active ?? '-', color: wazuhData ? 'text-emerald-500' : 'text-gray-600' },
-                      { label: 'Disconnected', val: wazuhData?.agents?.disconnected ?? '-', color: wazuhData && wazuhData.agents.disconnected > 0 ? 'text-red-500' : 'text-gray-600' },
+                      { label: 'Disconnected', val: wazuhData?.agents?.disconnected ?? '-', color: (wazuhData?.agents?.disconnected > 0) ? 'text-red-500' : 'text-gray-600' },
                       { label: 'Pending', val: wazuhData?.agents?.pending ?? '-', color: wazuhData ? 'text-amber-500' : 'text-gray-600' }
                     ].map(stat => (
                       <div key={stat.label} className="bg-obsidian border border-white/5 rounded-xl p-4 flex flex-col items-center justify-center shadow-inner">
@@ -860,8 +860,8 @@ export default function Dashboard({ user }) {
                   <div className="grid grid-cols-3 gap-4">
                     {[
                       { label: 'Total', val: wazuhData?.alerts?.total ?? '-', color: wazuhData ? 'text-white' : 'text-gray-600' },
-                      { label: 'Level 12+', val: wazuhData?.alerts?.high ?? '-', color: wazuhData && wazuhData.alerts.high > 0 ? 'text-red-500' : 'text-gray-600' },
-                      { label: 'Auth Failure', val: wazuhData?.alerts?.auth ?? '-', color: wazuhData && wazuhData.alerts.auth > 0 ? 'text-amber-500' : 'text-gray-600' }
+                      { label: 'Level 12+', val: wazuhData?.alerts?.high ?? '-', color: (wazuhData?.alerts?.high > 0) ? 'text-red-500' : 'text-gray-600' },
+                      { label: 'Auth Failure', val: wazuhData?.alerts?.auth ?? '-', color: (wazuhData?.alerts?.auth > 0) ? 'text-amber-500' : 'text-gray-600' }
                     ].map(stat => (
                       <div key={stat.label} className="bg-obsidian border border-white/5 rounded-xl p-4 flex flex-col items-center justify-center shadow-inner">
                         <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">{stat.label}</span>
