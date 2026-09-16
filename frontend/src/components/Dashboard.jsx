@@ -598,7 +598,12 @@ export default function Dashboard({ user }) {
 
             
             <div className="bg-matte border border-white/5 rounded-2xl p-6 shadow-xl">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Pod Status</h3>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pod Status</h3>
+                <button onClick={fetchOverview} disabled={isRefreshing} className="flex items-center gap-2 bg-obsidian border border-white/10 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:border-white/20 transition-all">
+                  <RefreshCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
+                </button>
+              </div>
               
               {overviewData && overviewData.error && (
                 <div className="bg-red-500/20 text-red-400 border border-red-500/30 p-3 mb-4 rounded-lg text-xs font-mono">
@@ -606,11 +611,25 @@ export default function Dashboard({ user }) {
                 </div>
               )}
               {overviewData && overviewData.pods && overviewData.pods.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {overviewData.pods.map((p, i) => (
-                    <div key={i} className="bg-obsidian border border-white/5 rounded-lg p-3 flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-300 truncate" title={p.name}>{p.name.split('/')[1] || p.name}</span>
-                      <span className={`text-[10px] uppercase font-bold tracking-widest ${['Running', 'Completed'].includes(p.status) ? 'text-emerald-500' : ['CrashLoopBackOff', 'Error', 'Failed', 'ImagePullBackOff', 'ErrImagePull'].includes(p.status) ? 'text-red-500' : 'text-amber-500'}`}>{p.status}</span>
+                <div className="flex flex-col gap-6 mt-4">
+                  {Object.entries(
+                    overviewData.pods.reduce((acc, pod) => {
+                      const cat = getPodCategory(pod.name)
+                      if (!acc[cat]) acc[cat] = []
+                      acc[cat].push(pod)
+                      return acc
+                    }, {})
+                  ).map(([category, pods]) => (
+                    <div key={category} className="bg-obsidian/50 rounded-xl p-4 border border-white/5">
+                      <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 border-b border-white/5 pb-2">{category} <span className="text-gray-600 ml-2">({pods.length})</span></h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0 text-sm">
+                        {pods.map((p, i) => (
+                          <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 hover:bg-white/[0.04] transition-colors rounded px-2 -mx-2">
+                            <span className="text-gray-300 truncate pr-4 text-[11px] font-mono" title={p.name}>{p.name.split('/')[1] || p.name}</span>
+                            <span className={`text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-white/5 ${['Running', 'Completed'].includes(p.status) ? 'text-emerald-400' : ['CrashLoopBackOff', 'Error', 'Failed', 'ImagePullBackOff', 'ErrImagePull'].includes(p.status) ? 'text-red-400' : 'text-amber-400'}`}>{p.status}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
