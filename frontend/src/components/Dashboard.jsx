@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { ErrorBoundary } from './ErrorBoundary'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '../firebase'
 import ModuleTree from './ModuleTree'
@@ -321,6 +322,7 @@ export default function Dashboard({ user }) {
   if (!client || !editClient) return <div className="min-h-screen flex items-center justify-center bg-obsidian text-white">Loading...</div>
 
   return (
+    <ErrorBoundary>
     <div className="flex-1 w-full min-h-screen bg-obsidian text-gray-200 font-sans flex flex-col relative overflow-hidden">
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-violet-glow blur-[150px] rounded-full opacity-20 pointer-events-none"></div>
       
@@ -882,6 +884,7 @@ export default function Dashboard({ user }) {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   )
 }
 
