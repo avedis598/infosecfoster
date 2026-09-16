@@ -87,9 +87,16 @@ export default function Dashboard({ user }) {
   
   const [client, setClient] = useState(null)
   const [editClient, setEditClient] = useState(null)
-  const [isConnected, setIsConnected] = useState(false)
+  const [isConnected, setIsConnected] = useState(localStorage.getItem('connected_' + id) === 'true')
   const [isConnecting, setIsConnecting] = useState(false)
-  const [activeTab, setActiveTab] = useState('Connection')
+  const [activeTab, setActiveTab] = useState(localStorage.getItem('tab_' + id) || 'Connection')
+
+  useEffect(() => {
+    if (id) {
+      localStorage.setItem('tab_' + id, activeTab)
+      localStorage.setItem('connected_' + id, isConnected.toString())
+    }
+  }, [activeTab, isConnected, id])
   
   const [selectedSteps, setSelectedSteps] = useState([])
   const [modulesHierarchy, setModulesHierarchy] = useState([])
@@ -267,6 +274,7 @@ export default function Dashboard({ user }) {
     setTimeout(() => {
       setIsConnected(true)
       setIsConnecting(false)
+      setActiveTab('Setup')
     }, 1500)
     
     if (editClient) {
