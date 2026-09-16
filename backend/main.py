@@ -326,8 +326,10 @@ async def monitor_wazuh(payload: MonitorPayload):
                 if res_agents.exit_status == 0 and res_agents.stdout:
                     try:
                         data = json.loads(res_agents.stdout)
-                        if "data" in data and "items" in data["data"]:
-                            for agent in data["data"]["items"]:
+                        if "data" in data:
+                            items = data["data"]["items"] if isinstance(data["data"], dict) and "items" in data["data"] else data["data"] if isinstance(data["data"], list) else []
+                            for agent in items:
+                                if agent.get("id") == "000": continue
                                 agents["total"] += 1
                                 status = agent.get("status", "").lower()
                                 if status == "active":
