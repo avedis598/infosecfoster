@@ -405,6 +405,15 @@ export default function Dashboard({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-white">
               {isConnected ? editClient.ip_address : 'Disconnected'}
             </span>
+            {isConnected && (
+              <button 
+                onClick={() => setShowTerminal(true)}
+                className="ml-2 text-gray-400 hover:text-white transition-colors"
+                title="Open Terminal"
+              >
+                <TerminalIcon className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-obsidian border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all">
             <LogOut className="w-3.5 h-3.5" />

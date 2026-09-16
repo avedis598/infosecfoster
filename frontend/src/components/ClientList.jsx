@@ -133,7 +133,7 @@ export default function ClientList({ user }) {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-white tracking-tight">Active Deployments</h2>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={handleAddNewClient}
             className="px-5 py-2.5 bg-violet hover:bg-violet-hover text-white rounded-full font-bold text-sm tracking-wide flex items-center gap-2 transition-all shadow-[0_0_20px_var(--color-violet-glow)] hover:shadow-[0_0_30px_var(--color-violet-glow)] transform hover:-translate-y-0.5"
           >
             <Plus className="w-4 h-4" /> Add Client
