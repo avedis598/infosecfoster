@@ -238,7 +238,7 @@ async def monitor_overview(payload: MonitorPayload):
     try:
         async with await get_ssh_conn(payload.client_id, payload.ip, payload.username) as conn:
             # Get Pods
-            res_pods = await conn.run("KUBECONFIG=$HOME/.kube/config kubectl get pods -A --no-headers | awk '{print $1"/"$2","$4}'", check=False)
+            res_pods = await conn.run("KUBECONFIG=$HOME/.kube/config kubectl get pods -A --no-headers | awk '{print $1\"/\"$2\",\"$4}'", check=False)
             pods = []
             debug_info = {
                 "pods_exit": res_pods.exit_status,
