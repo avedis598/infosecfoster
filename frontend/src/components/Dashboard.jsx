@@ -57,7 +57,11 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, debugMode, onComp
     const handleResize = () => fitAddon.fit()
     window.addEventListener('resize', handleResize)
     
-    return () => {
+    if (!client || !editClient) {
+    return <div className="min-h-screen bg-black flex items-center justify-center text-white"><Activity className="w-6 h-6 animate-spin text-violet" /></div>
+  }
+
+  return () => {
       window.removeEventListener('resize', handleResize)
       if (ws.readyState === WebSocket.OPEN) ws.close()
       term.dispose()
