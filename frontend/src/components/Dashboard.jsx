@@ -67,6 +67,19 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, debugMode, onComp
   return <div ref={terminalRef} className="w-full h-full p-4 overflow-hidden" />
 }
 
+
+const getPodCategory = (name) => {
+  const n = name.toLowerCase()
+  if (n.includes('wazuh')) return 'Wazuh SIEM'
+  if (n.includes('opensearch') && !n.includes('shuffle')) return 'OpenSearch Cluster'
+  if (n.includes('shuffle')) return 'Shuffle SOAR'
+  if (n.includes('thehive') || n.includes('cassandra')) return 'TheHive Platform'
+  if (n.includes('grafana') || n.includes('clickhouse')) return 'Metrics & Visualization'
+  if (n.includes('cronjob') || n.includes('report') || n.includes('threat-intel') || n.includes('test-')) return 'CronJobs & Tasks'
+  if (n.includes('kube-system') || n.includes('cert-manager') || n.includes('ingress') || n.includes('svclb')) return 'System Infrastructure'
+  return 'Other Services'
+}
+
 export default function Dashboard({ user }) {
   const { id } = useParams()
   const navigate = useNavigate()
