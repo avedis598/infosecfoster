@@ -591,6 +591,11 @@ export default function Dashboard({ user }) {
             
             <div className="bg-matte border border-white/5 rounded-2xl p-6 shadow-xl">
               <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Pod Status</h3>
+              {overviewData && overviewData.debug && (
+                <div className="bg-blue-500/20 text-blue-400 border border-blue-500/30 p-3 mb-4 rounded-lg text-xs font-mono break-all whitespace-pre-wrap">
+                  DEBUG: {JSON.stringify(overviewData.debug, null, 2)}
+                </div>
+              )}
               {overviewData && overviewData.error && (
                 <div className="bg-red-500/20 text-red-400 border border-red-500/30 p-3 mb-4 rounded-lg text-xs font-mono">
                   Error Fetching Data: {overviewData.error}
