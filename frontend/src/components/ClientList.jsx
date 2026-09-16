@@ -22,6 +22,23 @@ export default function ClientList({ user }) {
   })
   const navigate = useNavigate()
 
+  const handleAddNewClient = () => {
+    let cf_token = '';
+    let cf_zone = '';
+    for (const c of clients) {
+      if (c.cloudflare_token) {
+        cf_token = c.cloudflare_token;
+        cf_zone = c.cloudflare_zone || '';
+        break;
+      }
+    }
+    setNewClient({
+      client_name: '', client_id: '', ip_address: '', ssh_username: '', alert_email: '',
+      shuffle_api_key: '', cloudflare_token: cf_token, cloudflare_zone: cf_zone, private_key: ''
+    });
+    setShowModal(true);
+  }
+
   useEffect(() => {
     const q = query(collection(db, 'clients'), orderBy('created_at', 'desc'))
     const unsubscribe = onSnapshot(q, (snapshot) => {
