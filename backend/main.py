@@ -237,6 +237,19 @@ async def get_ssh_conn(client_id: str, ip: str, username: str):
 async def monitor_overview(payload: MonitorPayload):
     try:
         async with await get_ssh_conn(payload.client_id, payload.ip, payload.username) as conn:
+            # Get Server Health
+            health = {"cpu": 0, "memory": 0, "disk": "0%", "uptime": "Unknown"}
+            res_health = await conn.run("CPU_IDLE=$(vmstat 1 2 | tail -1 | awk '{print $15}'); echo \"$((100 - CPU_IDLE))|$(free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2}')|$(df -h / | awk 'NR==2{print $5}')|$(uptime -p)\"", check=False)
+            if res_health.exit_status == 0:
+                parts = res_health.stdout.strip().split('|')
+                if len(parts) == 4:
+                    health = {
+                        "cpu": float(parts[0]) if parts[0].replace('.','',1).isdigit() else 0,
+                        "memory": float(parts[1]) if parts[1].replace('.','',1).isdigit() else 0,
+                        "disk": parts[2],
+                        "uptime": parts[3].replace('up ', '')
+                    }
+
             # Get Pods
             res_pods = await conn.run("KUBECONFIG=$HOME/.kube/config kubectl get pods -A --no-headers | awk '{print $1\"/\"$2\",\"$4}'", check=False)
             pods = []
@@ -271,7 +284,7 @@ async def monitor_overview(payload: MonitorPayload):
             if res_pods.exit_status != 0 or res_img.exit_status != 0:
                 return {"status": "error", "message": f"Command failed. Debug: {debug_info}"}
                     
-            return {"status": "success", "pods": pods, "images": images, "debug": debug_info}
+            return {"status": "success", "pods": pods, "images": images, "health": health, "debug": debug_info}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
