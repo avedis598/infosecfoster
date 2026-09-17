@@ -1,13 +1,13 @@
 M0_STEPS = [
     {
         "id": '0.S01',
-        "pre_check": 'lsb_release -d | grep -q "Ubuntu 22.04"',
-        "pre_check_label": 'OS is Ubuntu 22.04 LTS',
+        "pre_check": 'lsb_release -i | grep -qi ubuntu && VERSION=$(lsb_release -rs | cut -d. -f1) && [ "$VERSION" -ge 22 ]',
+        "pre_check_label": 'OS is Ubuntu 22.04+ LTS',
         "mode": 'remote',
-        "title": 'M0.1 — Verify Ubuntu 22.04 & Static IP',
-        "desc": 'Verify the base server is Ubuntu 22.04 LTS and has a static IP assigned',
+        "title": 'M0.1 — Verify Ubuntu 22.04+ & Static IP',
+        "desc": 'Verify the base server is Ubuntu 22.04+ LTS and has a static IP assigned',
         "cmds": [
-            {'label': 'Check OS Version', 'cmd': 'lsb_release -d | grep "Ubuntu 22.04" || (echo "Must be Ubuntu 22.04" && exit 1)'},
+            {'label': 'Check OS Version', 'cmd': 'lsb_release -i | grep -qi ubuntu || (echo "Must be Ubuntu" && exit 1); VERSION=$(lsb_release -rs | cut -d. -f1); if [ "$VERSION" -ge 22 ]; then exit 0; else echo "Must be Ubuntu >= 22.04" && exit 1; fi'},
             {'label': 'Check Network Interfaces', 'cmd': 'ip -br a'}
         ],
     },
