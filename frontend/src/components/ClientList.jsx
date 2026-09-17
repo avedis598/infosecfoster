@@ -20,6 +20,7 @@ export default function ClientList({ user }) {
     cloudflare_token: ''
   })
   const navigate = useNavigate()
+  const [isCfTokenDerived, setIsCfTokenDerived] = useState(false)
 
   const handleAddNewClient = async () => {
     let cf_token = '';
@@ -29,6 +30,9 @@ export default function ClientList({ user }) {
       const data = await res.json();
       if (data.status === 'success' && data.token) {
         cf_token = data.token;
+        setIsCfTokenDerived(true);
+      } else {
+        setIsCfTokenDerived(false);
       }
     } catch (e) {
       console.error("Failed to fetch common CF token from GSM", e);
@@ -306,12 +310,27 @@ export default function ClientList({ user }) {
                 <h3 className="text-sm font-bold text-white mb-4">Cloudflare API (Optional)</h3>
                 <div className="grid grid-cols-1 gap-5">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">API Token</label>
+                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1 flex justify-between items-center">
+                      <span>API Token</span>
+                      {isCfTokenDerived && (
+                         <span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 flex items-center gap-1">
+                           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                           Secured by GSM
+                         </span>
+                      )}
+                    </label>
                     <input 
                       type="password"
-                      className="w-full px-4 py-3 bg-obsidian border border-white/10 rounded-[12px] text-white focus:ring-1 focus:ring-violet focus:border-violet outline-none transition-all placeholder:text-gray-700"
+                      className={`w-full px-4 py-3 rounded-[12px] text-white outline-none transition-all placeholder:text-gray-700 ${
+                        isCfTokenDerived 
+                          ? 'bg-blue-900/20 border-2 border-blue-500/40 focus:ring-1 focus:ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.1)] text-blue-200' 
+                          : 'bg-obsidian border border-white/10 focus:ring-1 focus:ring-violet focus:border-violet'
+                      }`}
                       value={newClient.cloudflare_token}
-                      onChange={(e) => setNewClient({ ...newClient, cloudflare_token: e.target.value })}
+                      onChange={(e) => {
+                        setNewClient({ ...newClient, cloudflare_token: e.target.value });
+                        setIsCfTokenDerived(false);
+                      }}
                       placeholder="cfut_C7vOHs..."
                     />
                   </div>
