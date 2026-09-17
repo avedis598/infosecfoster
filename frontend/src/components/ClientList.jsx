@@ -21,14 +21,19 @@ export default function ClientList({ user }) {
   })
   const navigate = useNavigate()
 
-  const handleAddNewClient = () => {
-    let cf_token = localStorage.getItem('cf_token_common') || '';
-    for (const c of clients) {
-      if (c.cloudflare_token) {
-        cf_token = c.cloudflare_token;
-        break;
+  const handleAddNewClient = async () => {
+    let cf_token = '';
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/api/secrets/cf/common`);
+      const data = await res.json();
+      if (data.status === 'success' && data.token) {
+        cf_token = data.token;
       }
+    } catch (e) {
+      console.error("Failed to fetch common CF token from GSM", e);
     }
+    
     setNewClient({
       client_name: '', client_id: '', ip_address: '', ssh_username: '', alert_email: '',
       shuffle_api_key: '', cloudflare_token: cf_token, private_key: ''
@@ -84,9 +89,6 @@ export default function ClientList({ user }) {
       }
 
       // Save everything else to Firestore, referencing only the Secret Name, NEVER the raw key
-      if (newClient.cloudflare_token) {
-        localStorage.setItem('cf_token_common', newClient.cloudflare_token);
-      }
       await addDoc(collection(db, 'clients'), {
         name: newClient.client_name,
         client_id: newClient.client_id,

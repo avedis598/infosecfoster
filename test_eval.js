@@ -1,0 +1,5 @@
+const fs = require('fs')
+const c = fs.readFileSync('frontend/src/components/Dashboard.jsx', 'utf8')
+const lines = c.split('\n')
+const useEffectIdx = lines.findIndex(l => l.includes("useEffect(() => {"))
+console.log(useEffectIdx)

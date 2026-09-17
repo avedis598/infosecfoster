@@ -187,9 +187,7 @@ export default function Dashboard({ user }) {
         setStatus('exists')
         setInput('')
         alert(`${type.toUpperCase()} securely uploaded to Google Secret Manager!`)
-        if (type === 'cf') {
-          localStorage.setItem('cf_token_common', input)
-        }
+
       } else {
         alert('Upload failed: ' + data.message)
       }
