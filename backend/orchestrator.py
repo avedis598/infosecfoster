@@ -58,7 +58,7 @@ class CloudOrchestrator:
         cmd_str = cmd_str.replace("aml-lab", self.client_id)
         
         if getattr(self, "debug_mode", False):
-            cmd_str = cmd_str.replace("2>/dev/null", "").replace(">/dev/null 2>&1", "").replace(">/dev/null", "")
+            cmd_str = cmd_str.replace("&>/dev/null", "").replace("2>/dev/null", "").replace(">/dev/null 2>&1", "").replace(">/dev/null", "")
             await self.ws.send_text(f"\x1b[36m[DEBUG CMD] {cmd_str}\x1b[0m\r\n")
             
         try:
