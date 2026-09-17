@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
-import { Server, Plus, Trash2, ArrowRight, ShieldAlert, LogOut, Key } from 'lucide-react'
+import { Server, Plus, Trash2, ArrowRight, ShieldAlert, LogOut, Key, CheckCircle2 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 
 export default function ClientList({ user }) {
