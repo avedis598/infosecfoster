@@ -128,7 +128,7 @@ class CloudOrchestrator:
                 self._update_db_status(updates)
                 step_ok = True
                 for i, cmd_dict in enumerate(step.get("cmds", [])):
-                    label = cmd_dict.get("label", f"Step {i+1}")
+                    label = cmd_dict.get("label", f"Step {i+1}").replace("aml-lab", self.client_id).replace("infosecfoster.com", self.domain)
                     await self.log(f"  → {label}", "cmd")
                 
                     sub_mode = cmd_dict.get("mode", step_mode)
@@ -137,7 +137,7 @@ class CloudOrchestrator:
                         if sub_mode == "local" or sub_mode.startswith("local_"):
                             # Cloud optimizations for local tasks
                             if sub_mode == "local_dns":
-                                record_name = cmd_dict.get("record_name", "test")
+                                record_name = cmd_dict.get("record_name", "test").replace("aml-lab", self.client_id).replace("infosecfoster.com", self.domain)
                                 try:
                                     import json, os
                                     import urllib.request
