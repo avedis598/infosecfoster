@@ -1,5 +1,16 @@
 M0_STEPS = [
     {
+        "id": '0.PREFLIGHT',
+        "pre_check": 'sudo -n true',
+        "pre_check_label": 'Passwordless Sudo Configured',
+        "mode": 'remote',
+        "title": 'M0.0 — Pre-flight Check: Sudo Privileges',
+        "desc": 'Ensure the SSH user can run sudo without a password prompt',
+        "cmds": [
+            {'label': 'Halt if sudo requires password', 'cmd': 'echo "\n\n[CRITICAL ERROR] Your SSH user requires a password for sudo!\nHetzner VMs do not configure NOPASSWD by default.\n\nPlease SSH into the server manually and run this exact command:\necho \"$USER ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/$USER\n\nThen run this deployment again!" && exit 1'}
+        ],
+    },
+    {
         "id": '0.S01',
         "pre_check": 'lsb_release -i | grep -qi ubuntu && VERSION=$(lsb_release -rs | cut -d. -f1) && [ "$VERSION" -ge 22 ]',
         "pre_check_label": 'OS is Ubuntu 22.04+ LTS',
@@ -7,7 +18,6 @@ M0_STEPS = [
         "title": 'M0.1 — Verify Ubuntu 22.04+ & Static IP',
         "desc": 'Verify the base server is Ubuntu 22.04+ LTS and has a static IP assigned',
         "cmds": [
-            {'label': 'Check Passwordless Sudo', 'cmd': 'sudo -n true || (echo "\n\n[CRITICAL ERROR] Your SSH user requires a password for sudo!\nHetzner VMs do not configure NOPASSWD by default.\n\nPlease SSH into the server manually and run this exact command:\necho \"$USER ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/$USER\n\nThen run this deployment again!" && exit 1)'},
             {'label': 'Check OS Version', 'cmd': 'lsb_release -i | grep -qi ubuntu || (echo "Must be Ubuntu" && exit 1); VERSION=$(lsb_release -rs | cut -d. -f1); if [ "$VERSION" -ge 22 ]; then exit 0; else echo "Must be Ubuntu >= 22.04" && exit 1; fi'},
             {'label': 'Check Network Interfaces', 'cmd': 'ip -br a'}
         ],
