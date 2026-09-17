@@ -145,8 +145,18 @@ class CloudOrchestrator:
                                     secret_id = f"cf-token-{self.client_id.lower().replace(' ', '-')}"
                                     parent = f"projects/{os.environ.get('PROJECT_ID', 'infosecfoster-5bb83')}"
                                     sm_client = secretmanager.SecretManagerServiceClient()
-                                    resp = sm_client.access_secret_version(request={"name": f"{parent}/secrets/{secret_id}/versions/latest"})
-                                    cf_token = resp.payload.data.decode('utf-8').strip()
+                                    try:
+                                        resp = sm_client.access_secret_version(request={"name": f"{parent}/secrets/{secret_id}/versions/latest"})
+                                        cf_token = resp.payload.data.decode('utf-8').strip()
+                                    except Exception:
+                                        cf_token = None
+                                        for secret in sm_client.list_secrets(request={"parent": parent}):
+                                            if "cf-token-" in secret.name:
+                                                resp = sm_client.access_secret_version(request={"name": f"{secret.name}/versions/latest"})
+                                                cf_token = resp.payload.data.decode('utf-8').strip()
+                                                break
+                                        if not cf_token:
+                                            raise Exception("Cloudflare token not found in Secret Manager.")
                                 
                                     req = urllib.request.Request(
                                         'https://api.cloudflare.com/client/v4/zones?name=infosecfoster.com',

@@ -428,8 +428,16 @@ async def check_secret(client_id: str, secret_type: str):
         secret_id = f"{prefix}-{client_id.lower().replace(' ', '-')}"
         name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
         client = secretmanager.SecretManagerServiceClient()
-        client.access_secret_version(request={"name": name})
-        return {"status": "success", "exists": True}
+        try:
+            client.access_secret_version(request={"name": name})
+            return {"status": "success", "exists": True}
+        except Exception:
+            if secret_type == "cf":
+                parent = f"projects/{PROJECT_ID}"
+                for secret in client.list_secrets(request={"parent": parent}):
+                    if "cf-token-" in secret.name:
+                        return {"status": "success", "exists": True}
+            return {"status": "success", "exists": False}
     except Exception as e:
         return {"status": "success", "exists": False}
 
