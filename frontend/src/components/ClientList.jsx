@@ -310,29 +310,20 @@ export default function ClientList({ user }) {
                 <h3 className="text-sm font-bold text-white mb-4">Cloudflare API (Optional)</h3>
                 <div className="grid grid-cols-1 gap-5">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1 flex justify-between items-center">
-                      <span>API Token</span>
-                      {isCfTokenDerived && (
-                         <span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 flex items-center gap-1">
-                           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                           Secured by GSM
-                         </span>
-                      )}
-                    </label>
-                    <input 
-                      type="password"
-                      className={`w-full px-4 py-3 rounded-[12px] text-white outline-none transition-all placeholder:text-gray-700 ${
-                        isCfTokenDerived 
-                          ? 'bg-blue-900/20 border-2 border-blue-500/40 focus:ring-1 focus:ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.1)] text-blue-200' 
-                          : 'bg-obsidian border border-white/10 focus:ring-1 focus:ring-violet focus:border-violet'
-                      }`}
-                      value={newClient.cloudflare_token}
-                      onChange={(e) => {
-                        setNewClient({ ...newClient, cloudflare_token: e.target.value });
-                        setIsCfTokenDerived(false);
-                      }}
-                      placeholder="cfut_C7vOHs..."
-                    />
+                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">API Token</label>
+                    {isCfTokenDerived ? (
+                      <div className="w-full flex items-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-[12px] text-blue-400 text-sm font-bold shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                        <CheckCircle2 className="w-4 h-4" /> Cloudflare API Token Stored (Secret Manager)
+                      </div>
+                    ) : (
+                      <input 
+                        type="password"
+                        className="w-full px-4 py-3 bg-obsidian border border-white/10 rounded-[12px] text-white focus:ring-1 focus:ring-violet focus:border-violet outline-none transition-all placeholder:text-gray-700"
+                        value={newClient.cloudflare_token}
+                        onChange={(e) => setNewClient({ ...newClient, cloudflare_token: e.target.value })}
+                        placeholder="cfut_C7vOHs..."
+                      />
+                    )}
                   </div>
 
                 </div>
