@@ -354,7 +354,7 @@ M0_STEPS = [
     },
     {
         "id": '0.N04C',
-        "pre_check": 'gcloud compute firewall-rules list --filter=name=aml-siem-allow-http 2>/dev/null | grep -q aml-siem-allow-http && gcloud compute firewall-rules list --filter=name=aml-siem-allow-https 2>/dev/null | grep -q aml-siem-allow-https',
+        "pre_check": 'if ! curl -s --connect-timeout 2 -H Metadata-Flavor:Google http://metadata.google.internal/computeMetadata/v1/instance/id >/dev/null; then exit 0; else gcloud compute firewall-rules list --filter=name=aml-siem-allow-http 2>/dev/null | grep -q aml-siem-allow-http && gcloud compute firewall-rules list --filter=name=aml-siem-allow-https 2>/dev/null | grep -q aml-siem-allow-https; fi',
         "pre_check_label": 'GCP firewall rules already exist',
         "mode": 'remote',
         "title": 'N04C — GCP VPC Firewall Rules',
