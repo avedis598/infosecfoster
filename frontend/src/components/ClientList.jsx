@@ -17,24 +17,21 @@ export default function ClientList({ user }) {
     private_key: '',
     alert_email: '',
     shuffle_api_key: '',
-    cloudflare_token: '',
-    cloudflare_zone: ''
+    cloudflare_token: ''
   })
   const navigate = useNavigate()
 
   const handleAddNewClient = () => {
-    let cf_token = '';
-    let cf_zone = '';
+    let cf_token = localStorage.getItem('cf_token_common') || '';
     for (const c of clients) {
       if (c.cloudflare_token) {
         cf_token = c.cloudflare_token;
-        cf_zone = c.cloudflare_zone || '';
         break;
       }
     }
     setNewClient({
       client_name: '', client_id: '', ip_address: '', ssh_username: '', alert_email: '',
-      shuffle_api_key: '', cloudflare_token: cf_token, cloudflare_zone: cf_zone, private_key: ''
+      shuffle_api_key: '', cloudflare_token: cf_token, private_key: ''
     });
     setShowModal(true);
   }
@@ -87,6 +84,9 @@ export default function ClientList({ user }) {
       }
 
       // Save everything else to Firestore, referencing only the Secret Name, NEVER the raw key
+      if (newClient.cloudflare_token) {
+        localStorage.setItem('cf_token_common', newClient.cloudflare_token);
+      }
       await addDoc(collection(db, 'clients'), {
         name: newClient.client_name,
         client_id: newClient.client_id,
@@ -96,14 +96,14 @@ export default function ClientList({ user }) {
         alert_email: newClient.alert_email,
         shuffle_api_key: newClient.shuffle_api_key,
         cloudflare_token: newClient.cloudflare_token,
-        cloudflare_zone: newClient.cloudflare_zone,
+        
         created_at: serverTimestamp(),
         owner_email: user.email
       })
       
       setNewClient({ 
         client_name: '', client_id: '', ip_address: '', ssh_username: '', private_key: '', 
-        alert_email: '', shuffle_api_key: '', cloudflare_token: '', cloudflare_zone: '' 
+        alert_email: '', shuffle_api_key: '', cloudflare_token: '' 
       })
       setShowModal(false)
     } catch (error) {
@@ -213,7 +213,7 @@ export default function ClientList({ user }) {
             <form onSubmit={handleAddClient} className="space-y-6">
               
               {/* Primary Config */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 gap-5">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">Client Name</label>
                   <input 
@@ -302,7 +302,7 @@ export default function ClientList({ user }) {
               {/* Cloudflare Section */}
               <div className="border-t border-white/5 pt-5">
                 <h3 className="text-sm font-bold text-white mb-4">Cloudflare API (Optional)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5">
                   <div>
                     <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">API Token</label>
                     <input 
@@ -313,16 +313,7 @@ export default function ClientList({ user }) {
                       placeholder="cfut_C7vOHs..."
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">Zone ID</label>
-                    <input 
-                      type="text"
-                      className="w-full px-4 py-3 bg-obsidian border border-white/10 rounded-[12px] text-white font-mono focus:ring-1 focus:ring-violet focus:border-violet outline-none transition-all placeholder:text-gray-700"
-                      value={newClient.cloudflare_zone}
-                      onChange={(e) => setNewClient({ ...newClient, cloudflare_zone: e.target.value })}
-                      placeholder="717dadb849..."
-                    />
-                  </div>
+
                 </div>
               </div>
 

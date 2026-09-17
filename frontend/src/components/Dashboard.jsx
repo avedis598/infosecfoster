@@ -187,6 +187,9 @@ export default function Dashboard({ user }) {
         setStatus('exists')
         setInput('')
         alert(`${type.toUpperCase()} securely uploaded to Google Secret Manager!`)
+        if (type === 'cf') {
+          localStorage.setItem('cf_token_common', input)
+        }
       } else {
         alert('Upload failed: ' + data.message)
       }
@@ -324,7 +327,7 @@ export default function Dashboard({ user }) {
         alert_email: editClient.alert_email,
         shuffle_api_key: editClient.shuffle_api_key,
         cloudflare_token: editClient.cloudflare_token,
-        cloudflare_zone: editClient.cloudflare_zone
+
       })
     }
   }
