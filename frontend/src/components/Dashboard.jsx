@@ -57,9 +57,7 @@ const DeployTerminal = ({ client, selectedSteps, forceExecute, debugMode, onComp
     const handleResize = () => fitAddon.fit()
     window.addEventListener('resize', handleResize)
     
-    if (!client || !editClient) {
-    return <div className="min-h-screen bg-[#0D0D0E] flex flex-col items-center justify-center text-white"><Activity className="w-12 h-12 animate-spin text-violet mb-4" /><h2 className="text-xl font-bold">Loading Client Data...</h2></div>
-  }
+
 
   return () => {
       window.removeEventListener('resize', handleResize)
