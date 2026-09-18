@@ -57,6 +57,21 @@ class CloudOrchestrator:
         cmd_str = cmd_str.replace("infosecfoster.com", self.domain)
         cmd_str = cmd_str.replace("aml-lab", self.client_id)
         
+        # Dynamically decode, replace, and re-encode any base64 Python scripts
+        import re, base64
+        def b64_replacer(match):
+            try:
+                decoded = base64.b64decode(match.group(1)).decode()
+                decoded = decoded.replace("admin@infosecfoster.com", self.alert_email)
+                decoded = decoded.replace("infosecfoster.com", self.domain)
+                decoded = decoded.replace("aml-lab", self.client_id)
+                re_encoded = base64.b64encode(decoded.encode()).decode()
+                return f"echo {re_encoded} | base64 -d"
+            except:
+                return match.group(0)
+        
+        cmd_str = re.sub(r"echo ([A-Za-z0-9+/=]+) \| base64 -d", b64_replacer, cmd_str)
+        
         if getattr(self, "debug_mode", False):
             cmd_str = cmd_str.replace("&>/dev/null", "").replace("2>/dev/null", "").replace(">/dev/null 2>&1", "").replace(">/dev/null", "")
             await self.ws.send_text(f"\x1b[36m[DEBUG CMD] {cmd_str}\x1b[0m\r\n")
