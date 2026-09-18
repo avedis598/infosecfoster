@@ -65,6 +65,13 @@ class CloudOrchestrator:
                 decoded = decoded.replace("admin@infosecfoster.com", self.alert_email)
                 decoded = decoded.replace("infosecfoster.com", self.domain)
                 decoded = decoded.replace("aml-lab", self.client_id)
+                # Universal SMTP fix to use local Mailpit instead of public SMTP
+                decoded = decoded.replace(
+                    'smtplib.SMTP_SSL("mail.infosecfoster.com", 465)',
+                    f'smtplib.SMTP("mailpit.{self.client_id}.svc.cluster.local", 1025, timeout=5)'
+                )
+                decoded = decoded.replace('s.login("alerts@infosecfoster.com", "Alert$!n_2o26")', 'pass')
+                decoded = decoded.replace('SMTP_SSL', 'SMTP')
                 re_encoded = base64.b64encode(decoded.encode()).decode()
                 return f"echo {re_encoded} | base64 -d"
             except:
