@@ -13,7 +13,11 @@ try:
 except Exception as e:
     print(f"Warning: Firebase Admin init failed: {e}")
 
+from api import shuffle
+
 app = FastAPI(title="AML SIEM Cloud Deployer")
+
+app.include_router(shuffle.router)
 
 app.add_middleware(
     CORSMiddleware,

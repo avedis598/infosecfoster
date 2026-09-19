@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
-import { Server, Plus, Trash2, ArrowRight, ShieldAlert, LogOut, Key, CheckCircle2 } from 'lucide-react'
+import { Server, Plus, Trash2, ArrowRight, ShieldAlert, LogOut, Key, CheckCircle2, Settings } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 
 export default function ClientList({ user }) {
@@ -145,9 +145,14 @@ export default function ClientList({ user }) {
         </div>
         <div className="flex items-center gap-6">
           <span className="text-xs font-semibold text-gray-400">{user.email}</span>
-          <button onClick={() => signOut(auth)} className="w-10 h-10 rounded-full bg-obsidian border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex gap-3">
+            <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-full bg-obsidian border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all">
+              <Settings className="w-4 h-4" />
+            </button>
+            <button onClick={() => signOut(auth)} className="w-10 h-10 rounded-full bg-obsidian border border-white/10 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-500/20 transition-all">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </nav>
 

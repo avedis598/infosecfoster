@@ -3,7 +3,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '../firebase'
 import ModuleTree from './ModuleTree'
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { LogOut, Terminal as TerminalIcon, Play, ArrowLeft, CheckCircle2, Cpu, HardDrive, Clock, Activity, X, Server, Shield, Database, LayoutDashboard, Settings2, RefreshCcw, ExternalLink, Copy, Info } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Terminal } from '@xterm/xterm'
@@ -89,24 +89,32 @@ export default function Dashboard({ user }) {
   
   const [client, setClient] = useState(null)
   const [editClient, setEditClient] = useState(null)
-  const [isConnected, setIsConnected] = useState(localStorage.getItem('connected_' + id) === 'true')
+  const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
-  const [activeTab, setActiveTab] = useState(localStorage.getItem('tab_' + id) || 'Connection')
+  const [activeTab, setActiveTab] = useState('Connection')
+  const [shuffleTemplates, setShuffleTemplates] = useState([])
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [isImportingTemplate, setIsImportingTemplate] = useState(false)
 
   useEffect(() => {
-    if (id) {
-      localStorage.setItem('tab_' + id, activeTab)
-      localStorage.setItem('connected_' + id, isConnected.toString())
-    }
+    // We no longer persist tab state to avoid confusing auto-navigations
   }, [activeTab, isConnected, id])
+  
+  useEffect(() => {
+    const q = query(collection(db, 'shuffle_templates'), orderBy('created_at', 'desc'))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setShuffleTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+    })
+    return () => unsubscribe()
+  }, [])
   
   const [selectedSteps, setSelectedSteps] = useState([])
   const [modulesHierarchy, setModulesHierarchy] = useState([])
   const [hasAutoNavigated, setHasAutoNavigated] = useState(false)
 
-  // Auto-navigate to Overview if all modules are SUCCESS
+  // Auto-navigate to Overview if all modules are SUCCESS and we are connected
   useEffect(() => {
-    if (modulesHierarchy.length === 0 || !client || !client.step_status || hasAutoNavigated) return;
+    if (modulesHierarchy.length === 0 || !client || !client.step_status || hasAutoNavigated || !isConnected) return;
     
     let allSuccess = true;
     let hasSteps = false;
@@ -117,22 +125,19 @@ export default function Dashboard({ user }) {
         const parts = step.id.split('.');
         let curr = client.step_status;
         for (const p of parts) {
-          if (curr && curr[p]) curr = curr[p];
-          else { curr = undefined; break; }
+          if (!curr || !curr[p]) { allSuccess = false; break; }
+          curr = curr[p];
         }
-        if (curr !== 'success') {
-          allSuccess = false;
-          break;
-        }
+        if (curr !== 'SUCCESS') { allSuccess = false; break; }
       }
-      if (!allSuccess) break;
     }
-
-    if (hasSteps && allSuccess) {
+    
+    // Only auto-navigate if they haven't explicitly chosen another tab
+    if (hasSteps && allSuccess && activeTab === 'Connection') {
       setActiveTab('Overview');
-      setHasAutoNavigated(true);
     }
-  }, [client?.step_status, modulesHierarchy, hasAutoNavigated]);
+    setHasAutoNavigated(true);
+  }, [client?.step_status, modulesHierarchy, hasAutoNavigated, isConnected, activeTab]);
   const [forceExecute, setForceExecute] = useState(false)
   const [debugMode, setDebugMode] = useState(false)
   const [deploying, setDeploying] = useState(false)
@@ -306,6 +311,13 @@ export default function Dashboard({ user }) {
 
   const handleConnect = async (e) => {
     e.preventDefault()
+    
+    if (isConnected) {
+      setIsConnected(false)
+      navigate('/')
+      return
+    }
+    
     setIsConnecting(true)
     
     setTimeout(() => {
@@ -359,6 +371,38 @@ export default function Dashboard({ user }) {
 
   const handleDeployComplete = () => {
     setDeploying(false)
+  }
+
+  const handleImportTemplate = async () => {
+    if (!selectedTemplate) return alert("Please select a template to import.")
+    if (!isConnected) return alert("Please connect to the server first.")
+    
+    setIsImportingTemplate(true)
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+      const clientId = editClient.client_id || editClient.name
+      
+      const res = await fetch(`${backendUrl}/api/clients/${clientId}/shuffle/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ template_id: selectedTemplate })
+      })
+      
+      const data = await res.json()
+      if (res.ok && data.status === 'success') {
+        alert('Template imported successfully!')
+        setSelectedTemplate('')
+      } else {
+        alert(`Failed to import template: ${data.message || data.detail || 'Unknown error'}`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Network error while trying to import template.')
+    } finally {
+      setIsImportingTemplate(false)
+    }
   }
 
   // Define env var for ws
@@ -971,8 +1015,8 @@ export default function Dashboard({ user }) {
 
         {/* ==================== SHUFFLE TAB ==================== */}
         {activeTab === 'Shuffle' && (
-          <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
-            <div className="bg-matte border border-white/5 rounded-3xl p-12 shadow-2xl flex flex-col items-center relative overflow-hidden">
+          <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500 pb-20">
+            <div className="bg-matte border border-white/5 rounded-3xl p-12 shadow-2xl flex flex-col items-center relative overflow-hidden mb-8">
               <div className="absolute top-[-50%] w-[800px] h-[800px] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none"></div>
               
               <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600 mb-4 z-10">
@@ -985,8 +1029,44 @@ export default function Dashboard({ user }) {
               </button>
               
               <div className="flex flex-col gap-2 items-center text-sm mb-12 z-10">
-                <div className="flex gap-2"><span className="text-gray-500 font-bold">Username:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">admin@shuffle.com</span></div>
-                <div className="flex gap-2"><span className="text-gray-500 font-bold">Password:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">admin</span></div>
+                <div className="flex gap-2"><span className="text-gray-500 font-bold">Username:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">admin</span></div>
+                <div className="flex gap-2"><span className="text-gray-500 font-bold">Password:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">Admin1234!</span></div>
+              </div>
+            </div>
+
+            <div className="bg-obsidian border border-white/5 rounded-3xl p-8 shadow-2xl relative z-10">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <LayoutDashboard className="w-5 h-5 text-purple-400" />
+                Import Workflows
+              </h2>
+              <p className="text-gray-400 text-sm mb-6">
+                Select a template from the global repository to instantly deploy it into this client's Shuffle instance.
+              </p>
+
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                <select 
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  className="w-full md:w-2/3 bg-black border border-white/10 rounded-lg px-4 py-3 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                >
+                  <option value="">-- Select a Template --</option>
+                  {shuffleTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} (from: {t.filename})</option>
+                  ))}
+                </select>
+                
+                <button 
+                  onClick={handleImportTemplate}
+                  disabled={isImportingTemplate || !selectedTemplate}
+                  className={`w-full md:w-1/3 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm tracking-wide transition-all shadow-lg ${
+                    isImportingTemplate || !selectedTemplate 
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
+                      : 'bg-purple-600 hover:bg-purple-500 text-white'
+                  }`}
+                >
+                  <Play className={`w-4 h-4 ${isImportingTemplate ? 'animate-pulse' : ''}`} />
+                  {isImportingTemplate ? 'Importing...' : 'Import to Client'}
+                </button>
               </div>
             </div>
           </div>

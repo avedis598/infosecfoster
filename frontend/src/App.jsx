@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import ClientList from './components/ClientList'
+import Settings from './components/Settings'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -35,6 +36,10 @@ function App() {
         <Route 
           path="/" 
           element={user ? <ClientList user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/settings" 
+          element={user ? <Settings user={user} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/client/:id" 

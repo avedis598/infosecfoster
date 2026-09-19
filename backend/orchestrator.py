@@ -73,11 +73,11 @@ class CloudOrchestrator:
                 decoded = decoded.replace('s.login("alerts@infosecfoster.com", "Alert$!n_2o26")', 'pass')
                 decoded = decoded.replace('SMTP_SSL', 'SMTP')
                 re_encoded = base64.b64encode(decoded.encode()).decode()
-                return f"echo {re_encoded} | base64 -d"
+                return f"echo '{re_encoded}' | base64 -d"
             except:
                 return match.group(0)
         
-        cmd_str = re.sub(r"echo ([A-Za-z0-9+/=]+) \| base64 -d", b64_replacer, cmd_str)
+        cmd_str = re.sub(r"echo '?([A-Za-z0-9+/=]+)'? \| base64 -d", b64_replacer, cmd_str)
         
         if getattr(self, "debug_mode", False):
             cmd_str = cmd_str.replace("&>/dev/null", "").replace("2>/dev/null", "").replace(">/dev/null 2>&1", "").replace(">/dev/null", "")
