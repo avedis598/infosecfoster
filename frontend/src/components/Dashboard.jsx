@@ -107,7 +107,7 @@ export default function Dashboard({ user }) {
       const clientId = editClient?.client_id || editClient?.name
       if (!clientId) return
       
-      const res = await fetch(`${backendUrl}/api/clients/${clientId}/shuffle/workflows`)
+      const res = await fetch(`${backendUrl}/clients/${clientId}/shuffle/workflows`)
       const data = await res.json()
       if (res.ok && data.status === 'success') {
         setShuffleWorkflows(data.workflows || [])
@@ -410,7 +410,7 @@ export default function Dashboard({ user }) {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
       const clientId = editClient.client_id || editClient.name
       
-      const res = await fetch(`${backendUrl}/api/clients/${clientId}/shuffle/import`, {
+      const res = await fetch(`${backendUrl}/clients/${clientId}/shuffle/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
