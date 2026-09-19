@@ -95,6 +95,31 @@ export default function Dashboard({ user }) {
   const [shuffleTemplates, setShuffleTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [isImportingTemplate, setIsImportingTemplate] = useState(false)
+  const [shuffleWorkflows, setShuffleWorkflows] = useState([])
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false)
+  const [workflowError, setWorkflowError] = useState(null)
+
+  const fetchShuffleWorkflows = async () => {
+    setIsLoadingWorkflows(true)
+    setWorkflowError(null)
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+      const clientId = editClient?.client_id || editClient?.name
+      if (!clientId) return
+      
+      const res = await fetch(`${backendUrl}/api/clients/${clientId}/shuffle/workflows`)
+      const data = await res.json()
+      if (res.ok && data.status === 'success') {
+        setShuffleWorkflows(data.workflows || [])
+      } else {
+        setWorkflowError(data.detail || data.message || 'Failed to fetch workflows')
+      }
+    } catch (err) {
+      setWorkflowError(err.message)
+    } finally {
+      setIsLoadingWorkflows(false)
+    }
+  }
 
   useEffect(() => {
     // We no longer persist tab state to avoid confusing auto-navigations
@@ -266,7 +291,10 @@ export default function Dashboard({ user }) {
     if (activeTab === 'Overview' && !overviewData) fetchOverview()
     if (activeTab === 'Wazuh' && !wazuhData) fetchWazuh()
     if (activeTab === 'TheHive' && !thehiveData) fetchService('thehive', setThehiveData)
-    if (activeTab === 'Shuffle' && !shuffleData) fetchService('shuffle', setShuffleData)
+    if (activeTab === 'Shuffle') {
+      if (!shuffleData) fetchService('shuffle', setShuffleData)
+      fetchShuffleWorkflows()
+    }
     if (activeTab === 'Grafana' && !grafanaData) fetchService('grafana', setGrafanaData)
   }, [activeTab])
 
@@ -394,6 +422,7 @@ export default function Dashboard({ user }) {
       if (res.ok && data.status === 'success') {
         alert('Template imported successfully!')
         setSelectedTemplate('')
+        fetchShuffleWorkflows()
       } else {
         alert(`Failed to import template: ${data.message || data.detail || 'Unknown error'}`)
       }
@@ -1068,6 +1097,56 @@ export default function Dashboard({ user }) {
                   {isImportingTemplate ? 'Importing...' : 'Import to Client'}
                 </button>
               </div>
+            </div>
+
+            <div className="bg-obsidian border border-white/5 rounded-3xl p-8 shadow-2xl relative z-10 mt-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-green-400" />
+                  Active Workflows
+                </h2>
+                <button 
+                  onClick={fetchShuffleWorkflows} 
+                  disabled={isLoadingWorkflows}
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400"
+                >
+                  <RefreshCcw className={`w-4 h-4 ${isLoadingWorkflows ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {workflowError ? (
+                <div className="text-red-400 text-sm bg-red-400/10 p-4 rounded-lg">
+                  {workflowError}
+                </div>
+              ) : isLoadingWorkflows && shuffleWorkflows.length === 0 ? (
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <RefreshCcw className="w-4 h-4 animate-spin" /> Loading workflows...
+                </div>
+              ) : shuffleWorkflows.length === 0 ? (
+                <div className="text-gray-500 text-sm italic">
+                  No workflows found. Import a template above to get started.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {shuffleWorkflows.map(wf => (
+                    <div key={wf.id} className="bg-black/50 border border-white/10 rounded-xl p-5 hover:border-purple-500/30 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-white font-bold text-base line-clamp-1">{wf.name}</h3>
+                        <span className={`px-2 py-0.5 text-xs rounded font-mono ${wf.status === 'running' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                          {wf.status || 'unknown'}
+                        </span>
+                      </div>
+                      <p className="text-gray-400 text-xs line-clamp-2 mb-4 h-8">
+                        {wf.description || 'No description provided.'}
+                      </p>
+                      <div className="flex justify-between items-center text-xs text-gray-500 font-mono">
+                        <span>Apps: {wf.apps ? wf.apps.length : 0}</span>
+                        <span>Triggers: {wf.triggers ? wf.triggers.length : 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -65,3 +65,40 @@ async def import_shuffle_workflow(client_id: str, req: ImportTemplateRequest):
         except httpx.RequestError as e:
             print("HTTP Request Error:", e)
             raise HTTPException(status_code=503, detail="Unable to reach client's Shuffle instance")
+
+@router.get("/clients/{client_id}/shuffle/workflows")
+async def list_shuffle_workflows(client_id: str):
+    clients_ref = db.collection('clients').where('client_id', '==', client_id).limit(1).get()
+    if not clients_ref:
+        client_doc = db.collection('clients').document(client_id).get()
+        if not client_doc.exists:
+            raise HTTPException(status_code=404, detail="Client not found")
+    else:
+        client_doc = clients_ref[0]
+
+    client_data = client_doc.to_dict()
+    shuffle_api_key = client_data.get('shuffle_api_key')
+    
+    if not shuffle_api_key:
+        raise HTTPException(status_code=400, detail="Shuffle API key is missing for this client.")
+
+    shuffle_url = f"https://shuffle.{client_id}.infosecfoster.com"
+    list_url = f"{shuffle_url}/api/v1/workflows"
+
+    headers = {
+        "Authorization": f"Bearer {shuffle_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    async with httpx.AsyncClient(verify=False) as http_client:
+        try:
+            resp = await http_client.get(list_url, headers=headers, timeout=10.0)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch workflows: {resp.text}")
+                
+            workflows = resp.json()
+            # Shuffle returns a list of workflow objects
+            return {"status": "success", "workflows": workflows}
+
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail="Unable to reach client's Shuffle instance")
