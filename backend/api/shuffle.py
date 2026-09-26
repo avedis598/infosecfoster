@@ -7,8 +7,10 @@ from google.cloud import firestore
 router = APIRouter()
 db = firestore.Client()
 
+from typing import Optional, Dict, Any
 class ImportTemplateRequest(BaseModel):
     template_id: str
+    config: Optional[Dict[str, Any]] = None
 
 @router.post("/clients/{client_id}/shuffle/import")
 async def import_shuffle_workflow(client_id: str, req: ImportTemplateRequest):
@@ -24,6 +26,36 @@ async def import_shuffle_workflow(client_id: str, req: ImportTemplateRequest):
     
     if not workflow_json:
         raise HTTPException(status_code=400, detail="Invalid template data: missing json payload")
+
+    # Apply Configuration Overrides if provided
+    if req.config:
+        email = req.config.get('alertEmail')
+        enable_block = req.config.get('enableAutoBlock', True)
+        whitelist = req.config.get('ipWhitelist')
+        
+        # Modify the JSON actions
+        if 'actions' in workflow_json:
+            for action in workflow_json['actions']:
+                # Update email
+                if action.get('app_name') == 'Email' and email:
+                    for param in action.get('parameters', []):
+                        if param.get('name') == 'recipient':
+                            param['value'] = email
+                            
+            # Handle Auto-Block removal
+            if not enable_block:
+                # Find the active response block node ID
+                block_node_id = None
+                for action in workflow_json.get('actions', []):
+                    if action.get('app_name') == 'Wazuh' and any(p.get('value') in ['firewall-drop', 'isolate-machine'] for p in action.get('parameters', [])):
+                        block_node_id = action.get('id')
+                        
+                if block_node_id:
+                    # Remove the action
+                    workflow_json['actions'] = [a for a in workflow_json['actions'] if a.get('id') != block_node_id]
+                    # Remove branches pointing to or from this action
+                    workflow_json['branches'] = [b for b in workflow_json.get('branches', []) if b.get('source_id') != block_node_id and b.get('destination_id') != block_node_id]
+
 
     # Fetch client data to get Shuffle API key
     # Wait, the client document ID might be the client_id, let's query the clients collection.

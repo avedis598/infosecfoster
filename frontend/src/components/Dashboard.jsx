@@ -94,6 +94,11 @@ export default function Dashboard({ user }) {
   const [activeTab, setActiveTab] = useState('Connection')
   const [shuffleTemplates, setShuffleTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [templateConfig, setTemplateConfig] = useState({
+    alertEmail: 'admin@company.com',
+    enableAutoBlock: true,
+    ipWhitelist: '10.0.0.0/8, 192.168.1.0/24'
+  })
   const [isImportingTemplate, setIsImportingTemplate] = useState(false)
   const [shuffleWorkflows, setShuffleWorkflows] = useState([])
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false)
@@ -415,7 +420,7 @@ export default function Dashboard({ user }) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ template_id: selectedTemplate })
+        body: JSON.stringify({ template_id: selectedTemplate, config: templateConfig })
       })
       
       const data = await res.json()
@@ -1097,6 +1102,46 @@ export default function Dashboard({ user }) {
                   {isImportingTemplate ? 'Importing...' : 'Import to Client'}
                 </button>
               </div>
+              
+              {selectedTemplate && (
+                <div className="mt-6 bg-black/40 border border-white/5 rounded-2xl p-6 space-y-4">
+                  <h3 className="text-white font-medium flex items-center gap-2 mb-4">
+                    <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                    Playbook Configuration Overrides
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Alert Email Address</label>
+                      <input 
+                        type="email" 
+                        value={templateConfig.alertEmail}
+                        onChange={(e) => setTemplateConfig({...templateConfig, alertEmail: e.target.value})}
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">IP Whitelist (Comma Separated)</label>
+                      <input 
+                        type="text" 
+                        value={templateConfig.ipWhitelist}
+                        onChange={(e) => setTemplateConfig({...templateConfig, ipWhitelist: e.target.value})}
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 pt-2">
+                    <button 
+                      onClick={() => setTemplateConfig({...templateConfig, enableAutoBlock: !templateConfig.enableAutoBlock})}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${templateConfig.enableAutoBlock ? 'bg-purple-600' : 'bg-gray-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${templateConfig.enableAutoBlock ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-sm text-gray-300">Enable Automated Firewall Blocking (Wazuh Active Response)</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-obsidian border border-white/5 rounded-3xl p-8 shadow-2xl relative z-10 mt-8">
