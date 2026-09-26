@@ -1,0 +1,126 @@
+{
+  "name": "PB04 - Phishing & Mail Flow Triage",
+  "description": "Detects malicious emails via Wazuh O365/Postfix logs, scans extracted URLs/Hashes via VirusTotal, and creates a TheHive case for the SOC team.",
+  "actions": [
+    {
+      "id": "vt-url-check",
+      "name": "Check URL in VirusTotal",
+      "app_name": "VirusTotal",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 150
+      },
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$exec.text.data.office365.Message.ExtendedProperties.Url"
+        }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "thehive-phishing-case",
+      "name": "Create Phishing Case",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 300
+      },
+      "parameters": [
+        {
+          "name": "title",
+          "value": "Suspicious Email: $exec.text.data.office365.Message.Subject"
+        },
+        {
+          "name": "description",
+          "value": "Wazuh detected a suspicious email delivered to a user inbox.\n\n- **Sender**: $exec.text.data.office365.Message.SenderAddress\n- **Recipient**: $exec.text.data.office365.UserId\n- **Subject**: $exec.text.data.office365.Message.Subject\n- **Suspicious URL**: $exec.text.data.office365.Message.ExtendedProperties.Url\n- **VirusTotal Malicious Score**: $vt-url-check.data.attributes.last_analysis_stats.malicious\n\nPlease investigate if the user clicked the link."
+        },
+        {
+          "name": "severity",
+          "value": "3"
+        },
+        {
+          "name": "tags",
+          "value": "[\"phishing\", \"office365\", \"mail-flow\"]"
+        }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    {
+      "id": "webhook-trigger",
+      "name": "Wazuh Webhook",
+      "app_name": "Webhook",
+      "type": "webhook",
+      "position": {
+        "x": 50,
+        "y": 150
+      },
+      "parameters": []
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-1",
+      "source_id": "webhook-trigger",
+      "destination_id": "vt-url-check",
+      "conditions": [
+        {
+          "condition": {
+            "name": "",
+            "value": "Contains"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.groups"
+          },
+          "destination": {
+            "name": "",
+            "value": "office365"
+          }
+        },
+        {
+          "condition": {
+            "name": "",
+            "value": "Exists"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.data.office365.Message.ExtendedProperties.Url"
+          },
+          "destination": {
+            "name": "",
+            "value": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "branch-2",
+      "source_id": "vt-url-check",
+      "destination_id": "thehive-phishing-case",
+      "conditions": [
+        {
+          "condition": {
+            "name": "",
+            "value": "Larger than"
+          },
+          "source": {
+            "name": "",
+            "value": "$vt-url-check.data.attributes.last_analysis_stats.malicious"
+          },
+          "destination": {
+            "name": "",
+            "value": "0"
+          }
+        }
+      ]
+    }
+  ],
+  "object_type": "workflow",
+  "id": "pb04-phishing-mail-triage",
+  "is_valid": true
+}

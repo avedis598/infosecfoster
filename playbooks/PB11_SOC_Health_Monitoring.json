@@ -1,0 +1,42 @@
+{
+  "name": "PB11 - SOC Infrastructure Health & Self-Monitoring",
+  "description": "Monitors the SIEM/SOAR infrastructure itself. Alerts the SIEM Engineering team if Wazuh agents disconnect, disk space fills up, or critical SOC tools crash.",
+  "actions": [
+    {
+      "id": "slack-siem-admin",
+      "name": "Page SIEM Engineering",
+      "app_name": "Slack",
+      "app_version": "1.0.0",
+      "position": { "x": 300, "y": 150 },
+      "parameters": [
+        { "name": "channel", "value": "#soc-infrastructure" },
+        { "name": "text", "value": "🚨 **SOC INFRASTRUCTURE ALERT** 🚨\n\n- **Component**: $exec.text.agent.name / Wazuh Manager\n- **Issue**: $exec.text.rule.description\n\nImmediate investigation required by the SIEM Engineering team to prevent blind spots." }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "thehive-p1-case",
+      "name": "Create P1 Infrastructure Ticket",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": { "x": 300, "y": 300 },
+      "parameters": [
+        { "name": "title", "value": "SOC HEALTH ALERT: $exec.text.rule.description" },
+        { "name": "description", "value": "A critical failure has been detected within the SIEM infrastructure.\n\n- **Node**: $exec.text.agent.name\n- **Details**: $exec.text.full_log\n\nEnsure this is resolved immediately to restore full visibility." },
+        { "name": "severity", "value": "4" },
+        { "name": "tags", "value": "[\"soc-health\", \"infrastructure\", \"p1\"]" }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    { "id": "webhook-trigger", "name": "Wazuh / Prometheus Webhook", "app_name": "Webhook", "type": "webhook", "position": { "x": 50, "y": 150 }, "parameters": [] }
+  ],
+  "branches": [
+    { "id": "branch-1", "source_id": "webhook-trigger", "destination_id": "slack-siem-admin", "conditions": [
+        { "condition": { "name": "", "value": "Contains" }, "source": { "name": "", "value": "$exec.text.rule.groups" }, "destination": { "name": "", "value": "ossec" } }
+    ] },
+    { "id": "branch-2", "source_id": "slack-siem-admin", "destination_id": "thehive-p1-case", "conditions": [] }
+  ],
+  "object_type": "workflow", "id": "pb11-soc-health", "is_valid": true
+}

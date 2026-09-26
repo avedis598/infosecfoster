@@ -1,0 +1,115 @@
+{
+  "name": "PB05 - Config & Code Change Auditing",
+  "description": "Monitors GitHub audit logs and server File Integrity (FIM) for unauthorized code or configuration changes. Alerts DevOps on Slack for verification.",
+  "actions": [
+    {
+      "id": "slack-alert",
+      "name": "Alert DevOps via Slack",
+      "app_name": "Slack",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 300
+      },
+      "parameters": [
+        {
+          "name": "channel",
+          "value": "#devops-alerts"
+        },
+        {
+          "name": "text",
+          "value": "⚠️ *Unauthorized Configuration Change Detected*\n\n- **Host/Platform**: $exec.text.agent.name\n- **File/Resource**: $exec.text.syscheck.path\n- **Event**: $exec.text.rule.description\n\nPlease verify if this change was made via an approved CI/CD pipeline."
+        }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "thehive-case",
+      "name": "Create Audit Case",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 450
+      },
+      "parameters": [
+        {
+          "name": "title",
+          "value": "Audit: Unauthorized Code/Config Change on $exec.text.agent.name"
+        },
+        {
+          "name": "description",
+          "value": "Wazuh detected a sensitive configuration or code change outside of the normal CI/CD process.\n\n- **Host**: $exec.text.agent.name\n- **File Path**: $exec.text.syscheck.path\n- **Rule Description**: $exec.text.rule.description\n\nDevOps has been notified via Slack to verify the change."
+        },
+        {
+          "name": "severity",
+          "value": "2"
+        },
+        {
+          "name": "tags",
+          "value": "[\"fim\", \"audit\", \"config-change\"]"
+        }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    {
+      "id": "webhook-trigger",
+      "name": "Wazuh Webhook",
+      "app_name": "Webhook",
+      "type": "webhook",
+      "position": {
+        "x": 50,
+        "y": 300
+      },
+      "parameters": []
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-1",
+      "source_id": "webhook-trigger",
+      "destination_id": "slack-alert",
+      "conditions": [
+        {
+          "condition": {
+            "name": "",
+            "value": "Contains"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.groups"
+          },
+          "destination": {
+            "name": "",
+            "value": "ossec"
+          }
+        },
+        {
+          "condition": {
+            "name": "",
+            "value": "Contains"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.syscheck.path"
+          },
+          "destination": {
+            "name": "",
+            "value": "/etc/"
+          }
+        }
+      ]
+    },
+    {
+      "id": "branch-2",
+      "source_id": "slack-alert",
+      "destination_id": "thehive-case",
+      "conditions": []
+    }
+  ],
+  "object_type": "workflow",
+  "id": "pb05-config-code-monitoring",
+  "is_valid": true
+}

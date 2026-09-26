@@ -1,0 +1,47 @@
+{
+  "name": "PB07 - Suspicious Process & LOTL (Base64 Decode)",
+  "description": "Catches malicious PowerShell/Bash commands, decodes Base64 payloads natively in Shuffle, and creates a detailed TheHive incident.",
+  "actions": [
+    {
+      "id": "shuffle-tools-decode",
+      "name": "Decode Base64 Command",
+      "app_name": "Shuffle Tools",
+      "app_version": "1.0.0",
+      "position": { "x": 300, "y": 150 },
+      "parameters": [
+        { "name": "call", "value": "base64_decode" },
+        { "name": "data", "value": "$exec.text.data.win.eventdata.commandLine" }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "thehive-case",
+      "name": "Create Process Alert Case",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": { "x": 300, "y": 300 },
+      "parameters": [
+        { "name": "title", "value": "Malicious Process: $exec.text.agent.name" },
+        { "name": "description", "value": "A suspicious process (likely Living-off-the-Land) was executed.\n\n**Raw Command:**\n`$exec.text.data.win.eventdata.commandLine`\n\n**Decoded Payload:**\n`$shuffle-tools-decode.result`" },
+        { "name": "severity", "value": "3" },
+        { "name": "tags", "value": "[\"sysmon\", \"lotl\", \"base64\"]" }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    {
+      "id": "webhook-trigger",
+      "name": "Wazuh Webhook",
+      "app_name": "Webhook",
+      "type": "webhook",
+      "position": { "x": 50, "y": 150 },
+      "parameters": []
+    }
+  ],
+  "branches": [
+    { "id": "branch-1", "source_id": "webhook-trigger", "destination_id": "shuffle-tools-decode", "conditions": [] },
+    { "id": "branch-2", "source_id": "shuffle-tools-decode", "destination_id": "thehive-case", "conditions": [] }
+  ],
+  "object_type": "workflow", "id": "pb07-lotl-decode", "is_valid": true
+}

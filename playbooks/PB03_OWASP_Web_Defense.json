@@ -1,0 +1,161 @@
+{
+  "name": "PB03 - OWASP Web Attack Defense",
+  "description": "Detects OWASP Top 10 attacks (SQLi, XSS, Path Traversal) via Wazuh web logs, checks AbuseIPDB, blocks the attacker via Active Response, and creates a TheHive case.",
+  "actions": [
+    {
+      "id": "abuseipdb-check",
+      "name": "Check IP Reputation",
+      "app_name": "AbuseIPDB",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 150
+      },
+      "parameters": [
+        {
+          "name": "ip_address",
+          "value": "$exec.text.data.srcip"
+        },
+        {
+          "name": "max_age_in_days",
+          "value": "30"
+        }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "active-response-block",
+      "name": "Block Attacker IP (Firewall)",
+      "app_name": "Wazuh",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 300
+      },
+      "parameters": [
+        {
+          "name": "command",
+          "value": "firewall-drop"
+        },
+        {
+          "name": "arguments",
+          "value": "[\"$exec.text.data.srcip\"]"
+        },
+        {
+          "name": "agent_id",
+          "value": "$exec.text.agent.id"
+        }
+      ],
+      "priority": 0
+    },
+    {
+      "id": "thehive-case",
+      "name": "Create Web Attack Case",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": {
+        "x": 300,
+        "y": 450
+      },
+      "parameters": [
+        {
+          "name": "title",
+          "value": "OWASP Attack: $exec.text.rule.description"
+        },
+        {
+          "name": "description",
+          "value": "Wazuh detected a web attack targeting a managed server.\n\n- **Target Server**: $exec.text.agent.name\n- **Attacker IP**: $exec.text.data.srcip\n- **AbuseIPDB Confidence Score**: $abuseipdb-check.data.abuseConfidenceScore%\n- **Requested URL**: $exec.text.data.url\n\n**Action Taken**: The attacker IP has been blocked at the firewall."
+        },
+        {
+          "name": "severity",
+          "value": "2"
+        },
+        {
+          "name": "tags",
+          "value": "[\"owasp\", \"web-attack\", \"blocked\"]"
+        }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    {
+      "id": "webhook-trigger",
+      "name": "Wazuh Webhook",
+      "app_name": "Webhook",
+      "type": "webhook",
+      "position": {
+        "x": 50,
+        "y": 150
+      },
+      "parameters": []
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-1",
+      "source_id": "webhook-trigger",
+      "destination_id": "abuseipdb-check",
+      "conditions": [
+        {
+          "condition": {
+            "name": "",
+            "value": "Contains"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.groups"
+          },
+          "destination": {
+            "name": "",
+            "value": "attack"
+          }
+        },
+        {
+          "condition": {
+            "name": "",
+            "value": "Contains"
+          },
+          "source": {
+            "name": "",
+            "value": "$exec.text.rule.groups"
+          },
+          "destination": {
+            "name": "",
+            "value": "web"
+          }
+        }
+      ]
+    },
+    {
+      "id": "branch-2",
+      "source_id": "abuseipdb-check",
+      "destination_id": "active-response-block",
+      "conditions": [
+        {
+          "condition": {
+            "name": "",
+            "value": "Larger than"
+          },
+          "source": {
+            "name": "",
+            "value": "$abuseipdb-check.data.abuseConfidenceScore"
+          },
+          "destination": {
+            "name": "",
+            "value": "50"
+          }
+        }
+      ]
+    },
+    {
+      "id": "branch-3",
+      "source_id": "active-response-block",
+      "destination_id": "thehive-case",
+      "conditions": []
+    }
+  ],
+  "object_type": "workflow",
+  "id": "pb03-owasp-web-defense",
+  "is_valid": true
+}

@@ -1,0 +1,27 @@
+{
+  "name": "PB09 - USB / Removable Media Control",
+  "description": "Complies with CBK frameworks by detecting unauthorized USB insertions and alerting the security team.",
+  "actions": [
+    {
+      "id": "thehive-usb-case",
+      "name": "Create USB Incident",
+      "app_name": "TheHive",
+      "app_version": "1.0.0",
+      "position": { "x": 300, "y": 150 },
+      "parameters": [
+        { "name": "title", "value": "Compliance Violation: USB Inserted on $exec.text.agent.name" },
+        { "name": "description", "value": "A removable media device was plugged into a monitored endpoint.\n\n- Host: $exec.text.agent.name\n- Device Details: $exec.text.data.usb.name" },
+        { "name": "severity", "value": "2" },
+        { "name": "tags", "value": "[\"usb\", \"compliance\", \"cbk\"]" }
+      ],
+      "priority": 0
+    }
+  ],
+  "triggers": [
+    { "id": "webhook-trigger", "name": "Wazuh Webhook", "app_name": "Webhook", "type": "webhook", "position": { "x": 50, "y": 150 }, "parameters": [] }
+  ],
+  "branches": [
+    { "id": "branch-1", "source_id": "webhook-trigger", "destination_id": "thehive-usb-case", "conditions": [] }
+  ],
+  "object_type": "workflow", "id": "pb09-usb-control", "is_valid": true
+}
