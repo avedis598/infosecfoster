@@ -1,0 +1,124 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: clients
+// Document ID: auto-generated
+// Fields:
+//   - name: string (optional, <= 200 chars) - Display name of the client
+//   - client_id: string (required, <= 200 chars) - Identifier slug for the client
+//   - ip_address: string (required, <= 100 chars) - Target server IP address
+//   - ssh_username: string (required, <= 100 chars) - SSH username
+//   - ssh_secret_ref: string or null (optional, <= 500 chars) - Secret Manager version reference
+//   - alert_email: string (optional, <= 320 chars) - Alert recipient email
+//   - shuffle_api_key: string (optional, <= 500 chars) - Shuffle SOAR API key
+//   - cloudflare_token: string (optional, <= 500 chars) - Cloudflare tunnel/API token
+//   - owner_email: string (optional, <= 320 chars) - Creator email address
+//   - created_at: timestamp (optional) - Creation timestamp
+//   - Additional backend-managed telemetry/status fields (step_status, etc.)
+//
+// Collection: shuffle_templates
+// Document ID: auto-generated
+// Fields:
+//   - name: string (required, <= 300 chars) - Playbook template name
+//   - description: string (optional, <= 5000 chars) - Playbook description
+//   - filename: string (required, <= 300 chars) - Source JSON filename
+//   - json: map (required) - Parsed Shuffle workflow JSON payload
+//   - uploaded_by: string (optional, <= 320 chars) - Uploader email
+//   - created_at: timestamp (optional) - Upload timestamp
+//
+// Collection: deployments
+// Document ID: auto-generated
+// Fields:
+//   - client_id: string (required, <= 200 chars) - Target client identifier
+//   - server_ip: string (required, <= 100 chars) - Target server IP
+//   - steps: list (required, <= 100 items) - Selected module steps
+//   - force: bool (optional) - Whether force execution was enabled
+//   - status: string (required, <= 100 chars) - Deployment status
+//   - user_email: string (optional, <= 320 chars) - Triggering user email
+//   - created_at: timestamp (optional) - Creation timestamp
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in both create and update)
+    // ===============================================================
+
+    function isValidClient(data) {
+      return data.client_id is string && data.client_id.size() > 0 && data.client_id.size() <= 200 &&
+             data.ip_address is string && data.ip_address.size() > 0 && data.ip_address.size() <= 100 &&
+             data.ssh_username is string && data.ssh_username.size() > 0 && data.ssh_username.size() <= 100 &&
+             isValidOptionalString(data, 'name', 200) &&
+             isValidOptionalString(data, 'ssh_secret_ref', 500) &&
+             isValidOptionalString(data, 'alert_email', 320) &&
+             isValidOptionalString(data, 'shuffle_api_key', 500) &&
+             isValidOptionalString(data, 'cloudflare_token', 500) &&
+             isValidOptionalString(data, 'owner_email', 320);
+    }
+
+    function isValidShuffleTemplate(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 300 &&
+             data.filename is string && data.filename.size() > 0 && data.filename.size() <= 300 &&
+             data.json is map &&
+             isValidOptionalString(data, 'description', 5000) &&
+             isValidOptionalString(data, 'uploaded_by', 320);
+    }
+
+    function isValidDeployment(data) {
+      return data.client_id is string && data.client_id.size() > 0 && data.client_id.size() <= 200 &&
+             data.server_ip is string && data.server_ip.size() > 0 && data.server_ip.size() <= 100 &&
+             data.steps is list && data.steps.size() <= 100 &&
+             data.status is string && data.status.size() <= 100 &&
+             isValidOptionalString(data, 'user_email', 320);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow update: if isAuthenticated() && isValidClient(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /shuffle_templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidShuffleTemplate(request.resource.data);
+      allow update: if isAuthenticated() && isValidShuffleTemplate(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /deployments/{deploymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDeployment(request.resource.data);
+      allow update: if isAuthenticated() && isValidDeployment(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    // Default deny all other collections/paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

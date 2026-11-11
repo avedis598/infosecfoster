@@ -1,5 +1,5 @@
 
-from .grafana_assets import DASHBOARDS_YAML, TELEMETRY_AGGREGATOR_SCRIPT, OVERVIEW_DASHBOARD_JSON, ALERTS_DASHBOARD_JSON
+from .grafana_assets import TELEMETRY_AGGREGATOR_SCRIPT
 
 M3_STEPS = [
     {
@@ -326,79 +326,13 @@ INNER
     },
     {
         "id": "3.M3.3",
-        "title": "M3.3 — Grafana OSS 10.3 — Executive Dashboard",
-        "pre_check": "KUBECONFIG=~/.kube/config kubectl get deployment grafana -n aml-lab",
-        "pre_check_label": "Check if Grafana is deployed",
+        "title": "M3.3 — SIEM Telemetry Aggregator (Custom Dashboard Feed)",
+        "pre_check": "KUBECONFIG=~/.kube/config kubectl get cronjob siem-telemetry-cronjob -n aml-lab",
+        "pre_check_label": "Check if SIEM Telemetry Aggregator CronJob is deployed",
         "cmds": [
             {
-                "label": "Deploy Grafana Data Sources ConfigMap",
-                "cmd": """KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-datasources
-  namespace: aml-lab
-data:
-  datasources.yaml: |
-    apiVersion: 1
-    datasources:
-    - name: OpenSearch
-      uid: OpenSearch
-      type: grafana-opensearch-datasource
-      url: http://opensearch.aml-lab.svc.cluster.local:9200
-      access: proxy
-      jsonData:
-        database: "wazuh-alerts-*"
-        timeField: "timestamp"
-        version: "2.13.0"
-    - name: SIEM-Telemetry
-      uid: SIEM-Telemetry
-      type: grafana-opensearch-datasource
-      url: http://opensearch.aml-lab.svc.cluster.local:9200
-      access: proxy
-      jsonData:
-        database: "siem-telemetry"
-        timeField: "timestamp"
-        version: "2.13.0"
-    - name: TheHive
-      uid: TheHive
-      type: yesoreyeram-infinity-datasource
-      url: http://thehive.aml-lab.svc.cluster.local:9000/api/v1
-      access: proxy
-      secureJsonData:
-        httpHeaderValue1: "Bearer ${THEHIVE_API_KEY}"
-        httpHeaderValue2: "application/json"
-      jsonData:
-        httpHeaderName1: "Authorization"
-        httpHeaderName2: "Content-Type"
-        global_queries: []
-INNER
-"""
-            },
-            {
-                "label": "Deploy Grafana Dashboards ConfigMaps",
-                "cmd": f"""KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-dashboards-provider
-  namespace: aml-lab
-data:
-  dashboards.yaml: |
-{chr(10).join('    ' + line for line in DASHBOARDS_YAML.splitlines())}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-dashboards-json
-  namespace: aml-lab
-data:
-  unified-dashboard.json: |
-{chr(10).join('    ' + line for line in OVERVIEW_DASHBOARD_JSON.splitlines())}
-  alerts-dashboard.json: |
-{chr(10).join('    ' + line for line in ALERTS_DASHBOARD_JSON.splitlines())}
-INNER
-"""
+                "label": "Remove legacy Grafana deployment if present",
+                "cmd": "KUBECONFIG=~/.kube/config kubectl delete deployment,service,ingress,configmap -n aml-lab -l app=grafana --ignore-not-found && KUBECONFIG=~/.kube/config kubectl delete deployment/grafana service/grafana ingress/grafana-ingress configmap/grafana-datasources configmap/grafana-dashboards-provider configmap/grafana-dashboards-json -n aml-lab --ignore-not-found"
             },
             {
                 "label": "Deploy SIEM Telemetry Aggregator",
@@ -437,129 +371,18 @@ spec:
           restartPolicy: OnFailure
 INNER
 """
-            },
-            {
-                "label": "Deploy Grafana",
-                "cmd": """KUBECONFIG=~/.kube/config kubectl apply -f - <<'INNER'
-apiVersion: v1
-kind: Service
-metadata:
-  name: grafana
-  namespace: aml-lab
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 3000
-    targetPort: 3000
-  selector:
-    app: grafana
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: grafana
-  namespace: aml-lab
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-  template:
-    metadata:
-      labels:
-        app: grafana
-    spec:
-      containers:
-      - name: grafana
-        image: grafana/grafana:10.3.3
-        ports:
-        - containerPort: 3000
-        env:
-        - name: GF_INSTALL_PLUGINS
-          value: grafana-opensearch-datasource,grafana-clickhouse-datasource,marcusolsson-json-datasource,yesoreyeram-infinity-datasource
-        - name: GF_AUTH_ANONYMOUS_ENABLED
-          value: "true"
-        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-          value: Admin
-        - name: THEHIVE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: thehive-api-key
-              key: api-key
-        volumeMounts:
-        - name: grafana-datasources
-          mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
-          subPath: datasources.yaml
-        - name: grafana-dashboards-provider
-          mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
-          subPath: dashboards.yaml
-        - name: grafana-dashboards-json
-          mountPath: /var/lib/grafana/dashboards
-      volumes:
-      - name: grafana-datasources
-        configMap:
-          name: grafana-datasources
-      - name: grafana-dashboards-provider
-        configMap:
-          name: grafana-dashboards-provider
-      - name: grafana-dashboards-json
-        configMap:
-          name: grafana-dashboards-json
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana-ingress
-  namespace: aml-lab
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - grafana.aml-lab.infosecfoster.com
-    - grafana.aml-lab.infosecfoster.com
-    secretName: grafana-tls
-  rules:
-  - host: grafana.aml-lab.infosecfoster.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 3000
-  - host: grafana.aml-lab.infosecfoster.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 3000
-INNER
-"""
             }
-        ]    },
+        ]
+    },
     {
         "id": "3.GATE_M33",
-        "title": "Gate Verification — M3.3 Grafana",
+        "title": "Gate Verification — M3.3 Telemetry Aggregator",
         "mode": "remote",
-        "desc": "Verify Grafana pod is running and responding",
+        "desc": "Verify SIEM Telemetry CronJob is scheduled in the cluster",
         "cmds": [
             {
-                "label": "Gate: Check Grafana pod status",
-                "cmd": "(echo 'Waiting for Grafana pod to be ready...' && KUBECONFIG=~/.kube/config kubectl wait --for=condition=Ready pod -n aml-lab -l app=grafana --timeout=120s && echo 'GATE_PASS: Grafana is ready' || (echo 'GATE_FAIL: Grafana is not ready' && exit 1))"
-            },
-            {
-                "label": "Gate: Check Grafana HTTP API",
-                "cmd": "GRAFANA_POD=$(KUBECONFIG=~/.kube/config kubectl get pods -n aml-lab -l app=grafana -o jsonpath='{.items[0].metadata.name}'); for i in {1..10}; do if KUBECONFIG=~/.kube/config kubectl exec -n aml-lab $GRAFANA_POD -- curl -s http://localhost:3000/api/health | grep -q '\"database\": \"ok\"'; then echo 'GATE_PASS: Grafana API OK'; exit 0; fi; echo 'Waiting for Grafana API...'; sleep 5; done; echo 'GATE_FAIL: Grafana API failed'; exit 1"
+                "label": "Gate: Check SIEM Telemetry CronJob status",
+                "cmd": "KUBECONFIG=~/.kube/config kubectl get cronjob siem-telemetry-cronjob -n aml-lab && echo 'GATE_PASS: Telemetry Aggregator CronJob is active' || (echo 'GATE_FAIL: Telemetry Aggregator CronJob missing' && exit 1)"
             }
         ]
     },

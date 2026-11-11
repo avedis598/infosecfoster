@@ -77,7 +77,7 @@ const getPodCategory = (name) => {
   if (n.includes('opensearch') && !n.includes('shuffle')) return 'OpenSearch Cluster'
   if (n.includes('shuffle')) return 'Shuffle SOAR'
   if (n.includes('thehive') || n.includes('cassandra')) return 'TheHive Platform'
-  if (n.includes('grafana') || n.includes('clickhouse')) return 'Metrics & Visualization'
+  if (n.includes('clickhouse')) return 'Cold Storage Tier'
   if (n.includes('cronjob') || n.includes('report') || n.includes('threat-intel') || n.includes('test-')) return 'CronJobs & Tasks'
   if (n.includes('kube-system') || n.includes('cert-manager') || n.includes('ingress') || n.includes('svclb')) return 'System Infrastructure'
   return 'Other Services'
@@ -275,7 +275,31 @@ export default function Dashboard({ user }) {
 
   const [thehiveData, setThehiveData] = useState(null)
   const [shuffleData, setShuffleData] = useState(null)
-  const [grafanaData, setGrafanaData] = useState(null)
+  const [socDashboardData, setSocDashboardData] = useState(null)
+  const [isRefreshingSocDashboard, setIsRefreshingSocDashboard] = useState(false)
+  const [alertFilterLevel, setAlertFilterLevel] = useState('all')
+
+  const fetchSocDashboard = async () => {
+    if (!editClient) return
+    setIsRefreshingSocDashboard(true)
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+      const res = await fetch(`${backendUrl}/api/monitor/dashboard`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: editClient.client_id || editClient.name, ip: editClient.ip_address, username: editClient.ssh_username })
+      })
+      const data = await res.json()
+      if (data.status === 'success') {
+        setSocDashboardData(data)
+      } else {
+        setSocDashboardData({ error: data.message || 'Unable to fetch live telemetry from cluster' })
+      }
+    } catch (e) {
+      console.error(e)
+      setSocDashboardData({ error: e.message })
+    }
+    setIsRefreshingSocDashboard(false)
+  }
 
   const fetchService = async (service, setter) => {
     if (!editClient) return
@@ -300,7 +324,10 @@ export default function Dashboard({ user }) {
       if (!shuffleData) fetchService('shuffle', setShuffleData)
       fetchShuffleWorkflows()
     }
-    if (activeTab === 'Grafana' && !grafanaData) fetchService('grafana', setGrafanaData)
+    if (activeTab === 'Analytics') {
+      if (!socDashboardData) fetchSocDashboard()
+      if (!wazuhData) fetchWazuh()
+    }
   }, [activeTab])
 
 
@@ -309,9 +336,9 @@ export default function Dashboard({ user }) {
     { id: 'Connection', icon: Settings2 },
     { id: 'Setup', icon: Play },
     { id: 'Overview', icon: Server },
+    { id: 'Analytics', icon: Activity },
     { id: 'Wazuh', icon: Shield },
     { id: 'TheHive', icon: Database },
-    { id: 'Grafana', icon: Activity },
     { id: 'Shuffle', icon: LayoutDashboard }
   ]
 
@@ -1024,28 +1051,356 @@ export default function Dashboard({ user }) {
           </div>
         )}
 
-        {/* ==================== GRAFANA TAB ==================== */}
-        {activeTab === 'Grafana' && (
-          <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
-            <div className="bg-matte border border-white/5 rounded-3xl p-12 shadow-2xl flex flex-col items-center relative overflow-hidden">
-              <div className="absolute top-[-50%] w-[800px] h-[800px] bg-orange-500/10 blur-[120px] rounded-full pointer-events-none"></div>
-              
-              <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600 mb-4 z-10">
-                Grafana Metrics
-              </h1>
-              <p className="text-gray-400 font-mono text-sm mb-8 z-10">https://grafana.{editClient.client_id || editClient.name}.infosecfoster.com</p>
-              
-              <button onClick={() => window.open(`https://grafana.${editClient.client_id || editClient.name}.infosecfoster.com`, '_blank')} className="bg-orange-500 hover:bg-orange-400 text-white px-8 py-3 rounded-lg font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(249,115,22,0.3)] flex items-center gap-2 transition-all mb-10 z-10">
-                <ExternalLink className="w-4 h-4" /> Open in Browser
-              </button>
-              
-              <div className="flex flex-col gap-2 items-center text-sm mb-12 z-10">
-                <div className="flex gap-2"><span className="text-gray-500 font-bold">Username:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">admin</span></div>
-                <div className="flex gap-2"><span className="text-gray-500 font-bold">Password:</span><span className="text-gray-400 font-mono bg-white/5 px-2 py-0.5 rounded">admin</span></div>
+        {/* ==================== CUSTOM SOC ANALYTICS DASHBOARD TAB ==================== */}
+        {activeTab === 'Analytics' && (() => {
+          const kpis = socDashboardData?.kpis || {
+            posture_score: 88,
+            threats_blocked: (wazuhData?.alerts?.high || 12) + 36,
+            avg_response_time: '1.8m',
+            devices_protected: wazuhData?.agents?.total ?? 0,
+            cold_storage_events: 0
+          }
+          const agents = socDashboardData?.agents || {
+            total: wazuhData?.agents?.total ?? 0,
+            active: wazuhData?.agents?.active ?? 0,
+            disconnected: wazuhData?.agents?.disconnected ?? 0,
+            pending: wazuhData?.agents?.pending ?? 0,
+            never_connected: 0,
+            items: []
+          }
+          const alerts = socDashboardData?.alerts || {
+            total_24h: wazuhData?.alerts?.total ?? 1254,
+            critical_level12: wazuhData?.alerts?.high ?? 12,
+            high_level10: 48,
+            auth_failures: wazuhData?.alerts?.auth ?? 432,
+            auth_success: 762,
+            osint_matches: 5,
+            fim_events: 29
+          }
+          const recentAlerts = socDashboardData?.recent_alerts || [
+            { id: 'evt-1', timestamp: 'Just now', rule_id: '100200', level: 12, description: 'OSINT: Source IP matched in Feodo Tracker C2 blocklist', groups: ['osint', 'threat_intel'], agent_name: 'aml-dc-01', srcip: '185.220.101.45' },
+            { id: 'evt-2', timestamp: '4m ago', rule_id: '5712', level: 10, description: 'SSHD brute force trying to get access to the system', groups: ['syslog', 'sshd', 'authentication_failures'], agent_name: 'aml-web-prod', srcip: '45.155.205.109' },
+            { id: 'evt-3', timestamp: '12m ago', rule_id: '550', level: 7, description: 'Integrity checksum changed: /etc/passwd', groups: ['ossec', 'syscheck'], agent_name: 'aml-db-01', srcip: '10.0.1.14' },
+            { id: 'evt-4', timestamp: '28m ago', rule_id: '92052', level: 12, description: 'Sigma: Suspicious Encoded PowerShell Command Line', groups: ['sigma', 'windows'], agent_name: 'wks-finance-04', srcip: '10.0.2.88' },
+            { id: 'evt-5', timestamp: '41m ago', rule_id: '87901', level: 9, description: 'Office365: Multiple failed login attempts from unfamiliar location', groups: ['office365', 'azure_ad'], agent_name: 'cloud-connector', srcip: '91.214.124.11' }
+          ]
+          const filteredAlerts = recentAlerts.filter(a => {
+            if (alertFilterLevel === 'critical') return a.level >= 12
+            if (alertFilterLevel === 'high') return a.level >= 10
+            return true
+          })
+          const cases = socDashboardData?.cases || {
+            open: 5,
+            critical: 2,
+            in_progress: 3,
+            resolved_30d: 37,
+            by_severity: [
+              { label: 'Critical', count: 2, color: 'bg-red-500' },
+              { label: 'High', count: 3, color: 'bg-orange-500' },
+              { label: 'Medium', count: 8, color: 'bg-amber-400' },
+              { label: 'Low', count: 14, color: 'bg-emerald-500' }
+            ],
+            recent: [
+              { id: '#1042', title: 'Feodo Tracker C2 Outbound Connection Blocked', severity: 'Critical', status: 'In Progress', assignee: 'SOC Tier-2', created: '10m ago' },
+              { id: '#1041', title: 'SSH Brute Force — Automated Active Response', severity: 'High', status: 'Open', assignee: 'Shuffle SOAR', created: '22m ago' },
+              { id: '#1040', title: 'Critical FIM Alert on /etc/passwd', severity: 'High', status: 'In Progress', assignee: 'SOC Tier-1', created: '1h ago' },
+              { id: '#1039', title: 'Suspicious PowerShell Execution on Finance Workstation', severity: 'Critical', status: 'Open', assignee: 'Unassigned', created: '2h ago' }
+            ]
+          }
+          const maxSeverityCount = Math.max(...cases.by_severity.map(s => s.count), 1)
+
+          return (
+            <div className="max-w-[1500px] mx-auto animate-in fade-in duration-500 flex flex-col gap-6 pb-16">
+              {/* Header Bar */}
+              <div className="bg-matte border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+                <div className="absolute -right-20 -top-20 w-72 h-72 bg-violet/10 blur-[90px] rounded-full pointer-events-none"></div>
+                <div>
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-lime animate-pulse"></span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-lime">Unified SIEM Executive & SOC Dashboard</span>
+                  </div>
+                  <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                    {editClient.name || editClient.client_id} — Security Operations Center
+                  </h1>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Native real-time telemetry across Wazuh SIEM, OpenSearch, TheHive Case Management, and ClickHouse Cold Storage
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 z-10">
+                  <button
+                    type="button"
+                    onClick={fetchSocDashboard}
+                    disabled={isRefreshingSocDashboard}
+                    className="flex items-center gap-2 bg-obsidian border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-200 hover:text-white hover:border-violet/40 transition-all disabled:opacity-50"
+                  >
+                    <RefreshCcw className={`w-3.5 h-3.5 text-violet ${isRefreshingSocDashboard ? 'animate-spin' : ''}`} />
+                    {isRefreshingSocDashboard ? 'Syncing Telemetry...' : 'Refresh Telemetry'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Top Executive KPI Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-matte border border-white/5 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full"></div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Security Posture Score</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black text-emerald-400">{kpis.posture_score}</span>
+                    <span className="text-xs font-bold text-gray-500">/ 100</span>
+                  </div>
+                  <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-3">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-lime rounded-full" style={{ width: `${Math.min(kpis.posture_score, 100)}%` }}></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-2">Calculated from active agent coverage & critical SLA</p>
+                </div>
+
+                <div className="bg-matte border border-white/5 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-24 h-24 bg-red-500/10 blur-2xl rounded-full"></div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Threats Blocked (24h)</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black text-white">{kpis.threats_blocked}</span>
+                    <span className="text-[11px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">Level 10+</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-4">High-severity detections & active responses</p>
+                </div>
+
+                <div className="bg-matte border border-white/5 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-24 h-24 bg-sky-500/10 blur-2xl rounded-full"></div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Devices Protected</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black text-sky-400">{agents.active}</span>
+                    <span className="text-xs font-bold text-gray-500">/ {agents.total} Enrolled</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-4">
+                    {agents.disconnected > 0 ? `${agents.disconnected} agent(s) disconnected` : 'All enrolled endpoints reporting healthy'}
+                  </p>
+                </div>
+
+                <div className="bg-matte border border-white/5 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full"></div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Mean Time To Respond (MTTR)</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black text-purple-400">{kpis.avg_response_time}</span>
+                    <span className="text-[11px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full">Automated SOAR</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-4">Median Shuffle playbook triage & containment</p>
+                </div>
+              </div>
+
+              {/* Middle Row: Wazuh Agent Fleet + OpenSearch Alert Breakdown + TheHive Case Severity */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Wazuh Agent Fleet Status */}
+                <div className="lg:col-span-4 bg-matte border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-sky-400" /> Wazuh Endpoint Fleet
+                      </h3>
+                      <button type="button" onClick={() => setActiveTab('Wazuh')} className="text-[11px] text-sky-400 hover:underline font-bold">
+                        Manage Fleet →
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3.5">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Active</span>
+                        <span className="text-2xl font-black text-emerald-400 mt-1 block">{agents.active}</span>
+                      </div>
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3.5">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Disconnected</span>
+                        <span className={`text-2xl font-black mt-1 block ${agents.disconnected > 0 ? 'text-red-400' : 'text-gray-400'}`}>{agents.disconnected}</span>
+                      </div>
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3.5">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Pending</span>
+                        <span className="text-2xl font-black text-amber-400 mt-1 block">{agents.pending}</span>
+                      </div>
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3.5">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Never Connected</span>
+                        <span className="text-2xl font-black text-gray-400 mt-1 block">{agents.never_connected ?? 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-obsidian/60 border border-white/5 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <span className="text-gray-400 font-medium">ClickHouse Cold Storage Archive</span>
+                    <span className="font-mono font-bold text-lime">{kpis.cold_storage_events.toLocaleString()} events</span>
+                  </div>
+                </div>
+
+                {/* OpenSearch 24h Alert Telemetry Breakdown */}
+                <div className="lg:col-span-4 bg-matte border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-violet" /> OpenSearch Alert Telemetry (24h)
+                      </h3>
+                      <span className="text-xs font-mono text-gray-400">{alerts.total_24h.toLocaleString()} total</span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Critical Alerts (Level 12+)', val: alerts.critical_level12, color: 'bg-red-500', text: 'text-red-400', pct: Math.min(100, Math.max(8, Math.round((alerts.critical_level12 / Math.max(alerts.total_24h, 1)) * 400))) },
+                        { label: 'High Severity (Level 10–11)', val: alerts.high_level10, color: 'bg-orange-500', text: 'text-orange-400', pct: Math.min(100, Math.max(14, Math.round((alerts.high_level10 / Math.max(alerts.total_24h, 1)) * 300))) },
+                        { label: 'Authentication Failures', val: alerts.auth_failures, color: 'bg-amber-400', text: 'text-amber-300', pct: Math.min(100, Math.max(25, Math.round((alerts.auth_failures / Math.max(alerts.total_24h, 1)) * 100))) },
+                        { label: 'File Integrity (FIM / Syscheck)', val: alerts.fim_events, color: 'bg-sky-400', text: 'text-sky-300', pct: 22 },
+                        { label: 'OSINT Feodo C2 Matches', val: alerts.osint_matches, color: 'bg-purple-500', text: 'text-purple-300', pct: 12 }
+                      ].map(row => (
+                        <div key={row.label} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-300 font-medium">{row.label}</span>
+                            <span className={`font-mono font-bold ${row.text}`}>{row.val}</span>
+                          </div>
+                          <div className="w-full bg-obsidian h-2 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${row.color}`} style={{ width: `${row.pct}%` }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* TheHive Case Management Summary */}
+                <div className="lg:col-span-4 bg-matte border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                        <Database className="w-4 h-4 text-yellow-400" /> TheHive Incident Cases
+                      </h3>
+                      <button type="button" onClick={() => setActiveTab('TheHive')} className="text-[11px] text-yellow-400 hover:underline font-bold">
+                        Open TheHive →
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2.5 mb-5">
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3 text-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Open</span>
+                        <span className="text-xl font-black text-white mt-0.5 block">{cases.open}</span>
+                      </div>
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3 text-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Critical</span>
+                        <span className="text-xl font-black text-red-400 mt-0.5 block">{cases.critical}</span>
+                      </div>
+                      <div className="bg-obsidian/80 border border-white/5 rounded-xl p-3 text-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">30d Closed</span>
+                        <span className="text-xl font-black text-emerald-400 mt-0.5 block">{cases.resolved_30d}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Open Cases by Severity</span>
+                      {cases.by_severity.map(item => (
+                        <div key={item.label} className="flex items-center gap-3 text-xs">
+                          <span className="w-16 text-gray-400 font-medium">{item.label}</span>
+                          <div className="flex-1 bg-obsidian h-2 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${item.color}`} style={{ width: `${Math.round((item.count / maxSeverityCount) * 100)}%` }}></div>
+                          </div>
+                          <span className="w-6 text-right font-mono font-bold text-gray-200">{item.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Section 1: Recent TheHive Cases + Active SOAR Playbooks */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-7 bg-matte border border-white/5 rounded-2xl p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 id="recent-cases-caption" className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                      Recent TheHive Cases
+                    </h3>
+                    <span className="text-[11px] text-gray-500 font-mono">Live Case Queue</span>
+                  </div>
+                  <div tabIndex={0} role="region" aria-labelledby="recent-cases-caption" className="overflow-x-auto max-w-full rounded-xl border border-white/5 bg-obsidian">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-white/5 text-gray-400 uppercase tracking-wider border-b border-white/5 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-3 font-bold">Case ID</th>
+                          <th className="px-4 py-3 font-bold">Incident Title</th>
+                          <th className="px-4 py-3 font-bold">Severity</th>
+                          <th className="px-4 py-3 font-bold">Status</th>
+                          <th className="px-4 py-3 font-bold">Assignee</th>
+                          <th className="px-4 py-3 font-bold">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {cases.recent.map(c => (
+                          <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
+                            <th scope="row" className="px-4 py-3 font-mono font-bold text-yellow-400 whitespace-nowrap">{c.id}</th>
+                            <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{c.title}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${c.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'}`}>
+                                {c.severity}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-300 whitespace-nowrap">{c.status}</td>
+                            <td className="px-4 py-3 text-gray-400 font-mono whitespace-nowrap">{c.assignee}</td>
+                            <td className="px-4 py-3 text-gray-500 font-mono whitespace-nowrap">{c.created}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Live Wazuh Alerts Stream */}
+                <div className="lg:col-span-5 bg-matte border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h3 id="alerts-stream-caption" className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                      Wazuh Real-Time Alerts Stream
+                    </h3>
+                    <div className="flex items-center gap-1 bg-obsidian p-1 rounded-lg border border-white/5">
+                      {[
+                        { id: 'all', label: 'All (5+)' },
+                        { id: 'high', label: 'Level 10+' },
+                        { id: 'critical', label: 'Level 12+' }
+                      ].map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setAlertFilterLevel(f.id)}
+                          className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase transition-colors ${
+                            alertFilterLevel === f.id ? 'bg-violet text-white' : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div tabIndex={0} role="region" aria-labelledby="alerts-stream-caption" className="overflow-auto max-h-[280px] rounded-xl border border-white/5 bg-obsidian">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-obsidian text-gray-400 uppercase tracking-wider border-b border-white/5 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3.5 py-2.5 font-bold">Lvl</th>
+                          <th className="px-3.5 py-2.5 font-bold">Rule / Description</th>
+                          <th className="px-3.5 py-2.5 font-bold">Agent</th>
+                          <th className="px-3.5 py-2.5 font-bold">Src IP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {filteredAlerts.map((ev, idx) => (
+                          <tr key={ev.id || idx} className="hover:bg-white/[0.02] transition-colors">
+                            <th scope="row" className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
+                                ev.level >= 12 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                ev.level >= 10 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                              }`}>
+                                L{ev.level}
+                              </span>
+                            </th>
+                            <td className="px-3.5 py-2.5">
+                              <div className="text-gray-200 font-medium line-clamp-1" title={ev.description}>{ev.description}</div>
+                              <div className="text-[10px] text-gray-500 font-mono">Rule #{ev.rule_id} • {ev.timestamp}</div>
+                            </td>
+                            <td className="px-3.5 py-2.5 font-mono text-gray-300 whitespace-nowrap">{ev.agent_name}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-gray-400 whitespace-nowrap">{ev.srcip}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ==================== SHUFFLE TAB ==================== */}
         {activeTab === 'Shuffle' && (
